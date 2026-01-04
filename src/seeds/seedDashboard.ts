@@ -84,8 +84,15 @@ const seedDashboardData = async () => {
 
       const createdSuppliers = [];
       for (const supplierData of suppliersData) {
-        const supplier = await prisma.supplier.create({
-          data: supplierData,
+        const supplier = await prisma.supplier.upsert({
+          where: {
+            companyId_name: {
+              companyId: supplierData.companyId,
+              name: supplierData.name
+            }
+          },
+          update: supplierData,
+          create: supplierData,
         });
         createdSuppliers.push(supplier);
       }
@@ -148,8 +155,15 @@ const seedDashboardData = async () => {
       }
 
       for (const itemData of inventoryData) {
-        await prisma.inventory.create({
-          data: itemData,
+        await prisma.inventory.upsert({
+          where: {
+            companyId_sku: {
+              companyId: itemData.companyId,
+              sku: itemData.sku
+            }
+          },
+          update: itemData,
+          create: itemData,
         });
       }
       console.log(`    ✅ Created ${inventoryData.length} inventory items`);
@@ -204,8 +218,12 @@ const seedDashboardData = async () => {
       }
 
       for (const orderData of ordersData) {
-        await prisma.order.create({
-          data: orderData,
+        await prisma.order.upsert({
+          where: {
+            orderNumber: orderData.orderNumber
+          },
+          update: orderData,
+          create: orderData,
         });
       }
       console.log(`    ✅ Created ${ordersData.length} orders`);
@@ -256,8 +274,16 @@ const seedDashboardData = async () => {
       ];
 
       for (const forecast of forecastData) {
-        await prisma.demandForecast.create({
-          data: forecast,
+        await prisma.demandForecast.upsert({
+          where: {
+            companyId_week_year: {
+              companyId: forecast.companyId,
+              week: forecast.week,
+              year: forecast.year
+            }
+          },
+          update: forecast,
+          create: forecast,
         });
       }
       console.log(`    ✅ Created ${forecastData.length} demand forecasts`);
@@ -307,8 +333,16 @@ const seedDashboardData = async () => {
       ];
 
       for (const kpi of kpiData) {
-        await prisma.kPI.create({
-          data: kpi,
+        await prisma.kPI.upsert({
+          where: {
+            companyId_name_period: {
+              companyId: kpi.companyId,
+              name: kpi.name,
+              period: kpi.period
+            }
+          },
+          update: kpi,
+          create: kpi,
         });
       }
       console.log(`    ✅ Created ${kpiData.length} KPIs`);

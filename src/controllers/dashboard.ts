@@ -70,8 +70,18 @@ export const getOpenOrdersData = async (req: any, res: Response, next: NextFunct
   try {
     const { companyId } = req.user;
 
-    // Get all open orders (not completed)
-    const orders = await prisma.order.findMany({
+    // Get all open orders (not completed) for counts
+    const allOrders = await prisma.order.findMany({
+      where: {
+        companyId,
+        status: {
+          in: ['PENDING', 'ON_TIME', 'DELAYED'],
+        },
+      },
+    });
+
+    // Get recent orders with supplier info for display (limited to 50)
+    const recentOrders = await prisma.order.findMany({
       where: {
         companyId,
         status: {
@@ -89,16 +99,16 @@ export const getOpenOrdersData = async (req: any, res: Response, next: NextFunct
       orderBy: {
         createdAt: 'desc',
       },
-      take: 50, // Limit to 50 most recent
+      take: 50, // Limit to 50 most recent for display
     });
 
-    // Calculate counts
-    const pending = orders.filter(order => order.status === 'PENDING').length;
-    const delayed = orders.filter(order => order.status === 'DELAYED').length;
-    const onTime = orders.filter(order => order.status === 'ON_TIME').length;
+    // Calculate counts from ALL orders
+    const pending = allOrders.filter(order => order.status === 'PENDING').length;
+    const delayed = allOrders.filter(order => order.status === 'DELAYED').length;
+    const onTime = allOrders.filter(order => order.status === 'ON_TIME').length;
 
     // Format orders for response
-    const formattedOrders = orders.map(order => ({
+    const formattedOrders = recentOrders.map(order => ({
       id: order.orderNumber,
       supplierId: order.supplier.id,
       supplierName: order.supplier.name,
