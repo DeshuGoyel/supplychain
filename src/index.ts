@@ -7,6 +7,13 @@ import { PrismaClient } from '@prisma/client';
 // Import routes
 import authRoutes from './routes/auth';
 import dashboardRoutes from './routes/dashboard';
+import inventoryRoutes from './routes/inventory';
+import supplierRoutes from './routes/suppliers';
+import purchaseOrderRoutes from './routes/purchaseOrders';
+import shipmentRoutes from './routes/shipments';
+import demandRoutes from './routes/demand';
+import analyticsRoutes from './routes/analytics';
+import issueRoutes from './routes/issues';
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +51,13 @@ app.get('/api/health', (req: Request, res: Response) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/shipments', shipmentRoutes);
+app.use('/api/demand', demandRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/issues', issueRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -54,7 +68,14 @@ app.get('/', (req: Request, res: Response) => {
     endpoints: {
       health: '/api/health',
       auth: '/api/auth',
-      dashboard: '/api/dashboard'
+      dashboard: '/api/dashboard',
+      inventory: '/api/inventory',
+      suppliers: '/api/suppliers',
+      purchaseOrders: '/api/purchase-orders',
+      shipments: '/api/shipments',
+      demand: '/api/demand',
+      analytics: '/api/analytics',
+      issues: '/api/issues'
     }
   });
 });
