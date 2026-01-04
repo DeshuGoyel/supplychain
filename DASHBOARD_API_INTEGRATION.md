@@ -11,6 +11,87 @@ The Control Tower Dashboard now connects to real backend API endpoints for all f
 4. **Demand vs Supply** - 4-week forecast analysis
 5. **KPI Cards** - Key performance indicators (OTIF, DIO, Fill Rate, Turnover)
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Control Tower Dashboard                      │
+├─────────────────────────────────────────────────────────────────┤
+│  frontend/app/dashboard/page.tsx                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                    DashboardPage Component                   ││
+│  │  - State management for all widgets                          ││
+│  │  - Auto-refresh every 30 seconds                             ││
+│  │  - Error handling and retry logic                            ││
+│  │  - Online/offline detection                                  ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                        │                                          │
+│                        ▼                                          │
+│  frontend/services/dashboardService.ts                           │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                 Dashboard Service Layer                      ││
+│  │  - Re-exports API functions                                  ││
+│  │  - Query parameter types                                     ││
+│  │  - Clear cache function                                      ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                        │                                          │
+│                        ▼                                          │
+│  frontend/services/api/dashboardApi.ts                           │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                 API Integration Layer                        ││
+│  │  - HTTP calls to backend endpoints                           ││
+│  │  - Caching (30-second TTL)                                   ││
+│  │  - Error handling                                            ││
+│  │  - Query parameter building                                  ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                        │                                          │
+│                        ▼                                          │
+│  frontend/utils/api.ts                                           │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                 Axios Client with                            ││
+│  │  - JWT token injection                                       ││
+│  │  - 15-second timeout                                         ││
+│  │  - Retry logic (2 attempts for network/5xx errors)           ││
+│  │  - 401/403/429 handling                                      ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+                          │
+                          │ HTTP + JWT
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Backend (Port 3001)                         │
+├─────────────────────────────────────────────────────────────────┤
+│  src/routes/dashboard.ts                                         │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                 Dashboard Routes                             ││
+│  │  - GET /api/dashboard/inventory                              ││
+│  │  - GET /api/dashboard/orders                                 ││
+│  │  - GET /api/dashboard/suppliers                              ││
+│  │  - GET /api/dashboard/demand                                 ││
+│  │  - GET /api/dashboard/kpis                                   ││
+│  │  All routes require JWT authentication                       ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                        │                                          │
+│                        ▼                                          │
+│  src/controllers/dashboard.ts                                    │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                 Dashboard Controllers                        ││
+│  │  - Database queries via Prisma                               ││
+│  │  - Data aggregation and formatting                           ││
+│  │  - Query parameter filtering                                 ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+                          │
+                          │ Prisma ORM
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Database (SQLite/PostgreSQL)                │
+├─────────────────────────────────────────────────────────────────┤
+│  Tables: users, companies, inventory, orders, suppliers,         │
+│          demand_forecasts, kpis                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ## Backend API Endpoints
 
 All endpoints require JWT authentication via the `Authorization: Bearer <token>` header.
@@ -20,7 +101,60 @@ All endpoints require JWT authentication via the `Authorization: Bearer <token>`
 http://localhost:3001/api/dashboard
 ```
 
-### 1. Get Inventory Data
+### Query Parameters
+
+All endpoints support optional query parameters for filtering:
+
+#### Inventory Endpoint
+**Endpoint:** `GET /api/dashboard/inventory`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `stockLevel` | string | Filter by stock level (HEALTHY, LOW, OUT_OF_STOCK) |
+| `minStockValue` | number | Filter items with stock value >= this amount |
+| `maxStockValue` | number | Filter items with stock value <= this amount |
+
+#### Orders Endpoint
+**Endpoint:** `GET /api/dashboard/orders`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Filter by status (PENDING, ON_TIME, DELAYED) |
+| `priority` | string | Filter by priority (LOW, MEDIUM, HIGH) |
+| `supplierId` | string | Filter by supplier ID |
+| `limit` | number | Limit results (max 100, default 50) |
+
+#### Suppliers Endpoint
+**Endpoint:** `GET /api/dashboard/suppliers`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Filter by status (ACTIVE, INACTIVE) |
+| `minOnTimeRate` | number | Filter suppliers with on-time rate >= this value |
+| `minQualityRate` | number | Filter suppliers with quality rate >= this value |
+| `maxLeadTime` | number | Filter suppliers with lead time <= this value |
+
+#### Demand Endpoint
+**Endpoint:** `GET /api/dashboard/demand`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `weeks` | number | Number of weeks to fetch (max 12, default 4) |
+| `year` | number | Filter by specific year |
+| `startWeek` | number | Start from specific week |
+| `riskLevel` | string | Filter by risk level (SAFE, CAUTION, RISK) |
+
+#### KPIs Endpoint
+**Endpoint:** `GET /api/dashboard/kpis`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Filter by KPI name (OTIF, DIO, FILL_RATE, TURNOVER) |
+| `period` | string | Filter by period (e.g., "2025-01") |
+
+### API Responses
+
+#### 1. Get Inventory Data
 **Endpoint:** `GET /api/dashboard/inventory`
 
 **Response:**
@@ -42,7 +176,7 @@ http://localhost:3001/api/dashboard
 }
 ```
 
-### 2. Get Open Orders
+#### 2. Get Open Orders
 **Endpoint:** `GET /api/dashboard/orders`
 
 **Response:**
@@ -68,7 +202,7 @@ http://localhost:3001/api/dashboard
 }
 ```
 
-### 3. Get Supplier Data
+#### 3. Get Supplier Data
 **Endpoint:** `GET /api/dashboard/suppliers`
 
 **Response:**
@@ -102,7 +236,7 @@ http://localhost:3001/api/dashboard
 }
 ```
 
-### 4. Get Demand Forecast
+#### 4. Get Demand Forecast
 **Endpoint:** `GET /api/dashboard/demand`
 
 **Response:**
@@ -123,7 +257,7 @@ http://localhost:3001/api/dashboard
 }
 ```
 
-### 5. Get KPI Data
+#### 5. Get KPI Data
 **Endpoint:** `GET /api/dashboard/kpis`
 
 **Response:**
@@ -164,38 +298,56 @@ http://localhost:3001/api/dashboard
 ### API Client Configuration
 
 The frontend uses an Axios instance with:
-- Automatic JWT token injection
-- 10-second timeout
-- 401 error handling with automatic token clearing and redirect
-- Comprehensive error logging
+- **Automatic JWT token injection** via request interceptor
+- **15-second timeout** for all requests
+- **Retry logic** (2 attempts for network errors or 5xx responses)
+- **401/403/429 handling** with automatic token clearing and redirect
+- **Comprehensive error logging** for debugging
 
 **Location:** `frontend/utils/api.ts`
 
-### Dashboard Service
+### API Integration Layer
 
-All data fetching is centralized in `frontend/services/dashboardService.ts`:
+All data fetching is centralized with proper separation of concerns:
+
+**Location:** `frontend/services/api/dashboardApi.ts`
 
 ```typescript
-import apiClient from '@/utils/api';
+import dashboardApi from './api/dashboardApi';
 
-export async function getInventoryData(): Promise<InventoryData> {
-  const response = await apiClient.get<{ success: boolean; data: InventoryData }>('/api/dashboard/inventory');
+// Fetch inventory data with optional query parameters
+export async function getInventoryData(params?: InventoryQueryParams): Promise<InventoryData> {
+  return dashboardApi.fetchInventoryData(params);
+}
 
-  if (!response.data.success) {
-    throw new Error('Failed to fetch inventory data');
-  }
+// Fetch all dashboard data in parallel
+export async function getAllDashboardData(params?: DashboardQueryParams) {
+  return dashboardApi.fetchAllDashboardData(params);
+}
 
-  return response.data.data;
+// Clear dashboard cache on logout
+export function clearDashboardCache(): void {
+  dashboardApi.clearDashboardCache();
 }
 ```
+
+### Caching Strategy
+
+- **30-second cache TTL** for all dashboard endpoints
+- Cache is invalidated on logout via `clearDashboardCache()`
+- Parallel requests for all widgets for optimal performance
 
 ### Error Handling
 
 The API client intercepts responses and handles:
-- **401 Unauthorized:** Clears token and redirects to login
-- **Network Errors:** Shows user-friendly error messages
-- **Timeout Errors:** Handles requests that exceed 10 seconds
-- **5xx Errors:** Logs server errors for debugging
+
+- **401 Unauthorized:** Clears token, redirects to login with message "Your session has expired"
+- **403 Forbidden:** Shows permission denied message
+- **429 Too Many Requests:** Shows rate limit message with wait time
+- **Network Errors:** Shows connection error message
+- **Timeout Errors:** Shows timeout message after 15 seconds
+- **5xx Server Errors:** Shows server error message with retry option
+- **Retry Logic:** Automatically retries network/5xx errors up to 2 times
 
 ## Database Schema
 
@@ -331,7 +483,7 @@ npm run prisma:migrate
 # Seed user data
 npm run seed
 
-# Seed dashboard data
+# Seed dashboard data (inventory, orders, suppliers, forecasts, KPIs)
 npm run seed:dashboard
 
 # Start backend server
@@ -348,7 +500,7 @@ cd frontend
 # Install dependencies
 npm install
 
-# Create environment file
+# Create environment file (if not exists)
 cp .env.example .env.local
 
 # Start frontend server
@@ -356,6 +508,37 @@ npm run dev
 ```
 
 Frontend will run on `http://localhost:3000`
+
+### 3. Verify Integration
+
+After starting both servers:
+
+1. Navigate to `http://localhost:3000`
+2. Login with demo credentials:
+   - Email: `manager@acme.com`
+   - Password: `demo123`
+3. You should see the Control Tower Dashboard with real data
+4. The dashboard will auto-refresh every 30 seconds
+5. Check browser console for API request/response logs
+
+## Frontend Dashboard Features
+
+### Data Fetching
+- **Parallel Loading:** All 5 widgets fetch data simultaneously using `Promise.all`
+- **Caching:** 30-second client-side cache to reduce unnecessary requests
+- **Error Handling:** Graceful error display with retry options
+- **Online/Offline Detection:** Browser event listeners for connectivity status
+
+### UI States
+- **Loading State:** Skeleton loaders while fetching initial data
+- **Error State:** Detailed error messages with retry/reload options
+- **Refresh State:** Spinning refresh icon during manual refresh
+- **Data Freshness:** Color-coded indicator (green=fresh, yellow=current, orange=stale)
+
+### User Interactions
+- **Manual Refresh:** Button to trigger immediate data refresh
+- **Auto-refresh:** Automatic refresh every 30 seconds
+- **Connection Status:** Real-time online/offline indicator
 
 ## Authentication Flow
 
