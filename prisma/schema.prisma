@@ -64,7 +64,7 @@ model Order {
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   supplierId  String
   supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  orderNumber String
+  orderNumber String   @unique
   status      String   @default("PENDING") // PENDING, ON_TIME, DELAYED, COMPLETED
   priority    String   @default("MEDIUM")  // LOW, MEDIUM, HIGH
   eta         DateTime
@@ -93,6 +93,7 @@ model Supplier {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@unique([companyId, name])
   @@index([companyId])
   @@index([status])
   @@map("suppliers")
