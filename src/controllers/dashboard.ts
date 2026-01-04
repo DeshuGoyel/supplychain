@@ -18,7 +18,7 @@ export const getInventoryData = async (req: any, res: Response, next: NextFuncti
 
     // Calculate metrics
     const totalSKUs = inventory.length;
-    const stockValue = inventory.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
+    const stockValue = inventory.reduce((sum, item) => sum + (item.quantityOnHand * item.unitCost), 0);
     const lowStockCount = inventory.filter(item => item.stockLevel === 'LOW').length;
     const outOfStockCount = inventory.filter(item => item.stockLevel === 'OUT_OF_STOCK').length;
 
@@ -33,7 +33,7 @@ export const getInventoryData = async (req: any, res: Response, next: NextFuncti
       .slice(0, 5)
       .map(item => ({
         sku: item.sku,
-        qty: item.quantity,
+        qty: item.quantityOnHand,
       }));
 
     // Get top 5 slow movers (lowest turnover rate)
@@ -43,7 +43,7 @@ export const getInventoryData = async (req: any, res: Response, next: NextFuncti
       .slice(0, 5)
       .map(item => ({
         sku: item.sku,
-        qty: item.quantity,
+        qty: item.quantityOnHand,
       }));
 
     res.json({
@@ -75,8 +75,8 @@ export const getOpenOrdersData = async (req: any, res: Response, next: NextFunct
       where: {
         companyId,
         status: {
-          in: ['PENDING', 'ON_TIME', 'DELAYED'],
-        },
+          in: ['PENDING', 'ON_TIME', 'DELAYED']
+        } as any,
       },
       include: {
         supplier: {
@@ -143,42 +143,42 @@ export const getSupplierData = async (req: any, res: Response, next: NextFunctio
 
     // Calculate averages
     const avgOnTime = suppliers.length > 0
-      ? Math.round(suppliers.reduce((sum, s) => sum + s.onTimeRate, 0) / suppliers.length)
+      ? Math.round(suppliers.reduce((sum, s) => sum + s.onTimePct, 0) / suppliers.length)
       : 0;
     const avgQuality = suppliers.length > 0
-      ? Math.round(suppliers.reduce((sum, s) => sum + s.qualityRate, 0) / suppliers.length)
+      ? Math.round(suppliers.reduce((sum, s) => sum + s.qualityRating, 0) / suppliers.length)
       : 0;
     const avgLeadTime = suppliers.length > 0
-      ? Math.round(suppliers.reduce((sum, s) => sum + s.leadTime, 0) / suppliers.length * 10) / 10
+      ? Math.round(suppliers.reduce((sum, s) => sum + s.leadTimeDays, 0) / suppliers.length * 10) / 10
       : 0;
 
     // Get top 3 suppliers (highest combined performance score)
     const topSuppliers = suppliers
       .map(supplier => ({
         ...supplier,
-        performanceScore: (supplier.onTimeRate + supplier.qualityRate) / 2 - supplier.leadTime,
+        performanceScore: (supplier.onTimePct + supplier.qualityRating * 20) / 2 - supplier.leadTimeDays,
       }))
       .sort((a, b) => b.performanceScore - a.performanceScore)
       .slice(0, 3)
       .map(supplier => ({
         id: supplier.id,
         name: supplier.name,
-        onTime: Math.round(supplier.onTimeRate),
-        quality: Math.round(supplier.qualityRate),
-        leadTime: Math.round(supplier.leadTime * 10) / 10,
+        onTime: Math.round(supplier.onTimePct),
+        quality: Math.round(supplier.qualityRating),
+        leadTime: Math.round(supplier.leadTimeDays * 10) / 10,
       }));
 
     // Get underperforming suppliers (low on-time or quality, or high lead time)
     const underperforming = suppliers
       .filter(supplier =>
-        supplier.onTimeRate < 85 || supplier.qualityRate < 90 || supplier.leadTime > 10
+        supplier.onTimePct < 85 || supplier.qualityRating < 4 || supplier.leadTimeDays > 10
       )
       .map(supplier => ({
         id: supplier.id,
         name: supplier.name,
-        onTime: Math.round(supplier.onTimeRate),
-        quality: Math.round(supplier.qualityRate),
-        leadTime: Math.round(supplier.leadTime * 10) / 10,
+        onTime: Math.round(supplier.onTimePct),
+        quality: Math.round(supplier.qualityRating),
+        leadTime: Math.round(supplier.leadTimeDays * 10) / 10,
         issues: supplier.issues ? JSON.parse(supplier.issues) : [],
       }));
 

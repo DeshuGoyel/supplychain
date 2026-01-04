@@ -17,44 +17,78 @@ model User {
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([companyId])
   @@map("users")
 }
 
 model Company {
-  id                String             @id @default(cuid())
-  name              String
-  industry          String   // Manufacturing, Retail, Healthcare
-  employees         Int
-  users             User[]
-  inventory         Inventory[]
-  orders            Order[]
-  suppliers         Supplier[]
-  demandForecasts   DemandForecast[]
-  kpis              KPI[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                  String              @id @default(cuid())
+  name                String
+  industry            String   // Manufacturing, Retail, Healthcare
+  employees           Int
+  users               User[]
+  inventory           Inventory[]
+  orders              Order[]
+  suppliers           Supplier[]
+  demandForecasts     DemandForecast[]
+  kpis                KPI[]
+  locations           Location[]
+  purchaseOrders      PurchaseOrder[]
+  shipments           Shipment[]
+  issues              Issue[]
+  inventoryMovements  InventoryMovement[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   @@map("companies")
 }
 
-model Inventory {
-  id           String   @id @default(cuid())
-  companyId    String
-  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  sku          String
-  name         String
-  quantity     Int
-  unitCost     Float
-  stockLevel   String   @default("HEALTHY") // HEALTHY, LOW, OUT_OF_STOCK
-  turnoverRate Float?
-  lastUpdated  DateTime @updatedAt
-  createdAt    DateTime @default(now())
+model Location {
+  id        String     @id @default(cuid())
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  type      String     // WAREHOUSE, RETAIL, DC
+  address   String?
+  manager   String?
+  capacity  Int?
+  inventory Inventory[]
+  shipmentsFrom Shipment[] @relation("ShipmentFrom")
+  shipmentsTo   Shipment[] @relation("ShipmentTo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([companyId, sku])
   @@index([companyId])
+  @@index([type])
+  @@map("locations")
+}
+
+model Inventory {
+  id               String             @id @default(cuid())
+  companyId        String
+  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  locationId       String?
+  location         Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  sku              String
+  productName      String
+  quantityOnHand   Int                @default(0)
+  quantityReserved Int                @default(0)
+  reorderPoint     Int                @default(0)
+  reorderQty       Int                @default(0)
+  lastCountDate    DateTime?
+  unitCost         Float
+  stockLevel       String             @default("HEALTHY") // HEALTHY, LOW, OUT_OF_STOCK, OVERSTOCKED
+  turnoverRate     Float?
+  movements        InventoryMovement[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([companyId, locationId, sku])
+  @@index([companyId])
+  @@index([locationId])
   @@index([stockLevel])
+  @@index([sku])
   @@map("inventory")
 }
 
@@ -80,40 +114,122 @@ model Order {
 }
 
 model Supplier {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  orders      Order[]
-  name        String
-  onTimeRate  Float    @default(0)  // percentage
-  qualityRate Float    @default(0)  // percentage
-  leadTime    Float    @default(0)  // days
-  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
-  issues      String?  // JSON array of issues
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String         @id @default(cuid())
+  companyId         String
+  company           Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  orders            Order[]
+  purchaseOrders    PurchaseOrder[]
+  name              String
+  contactName       String?
+  email             String?
+  phone             String?
+  leadTimeDays      Float          @default(0)
+  paymentTerms      String?
+  performanceScore  Float          @default(0) // 0-100
+  onTimePct         Float          @default(0)
+  qualityRating     Float          @default(0) // 1-5
+  priceTier         String?
+  status            String         @default("ACTIVE") // ACTIVE, INACTIVE
+  issues            String?        // JSON array of issues
+  contractTerms     String?        // JSON object
+  communicationLog  String?        // JSON array of communications
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   @@index([companyId])
   @@index([status])
   @@map("suppliers")
 }
 
-model DemandForecast {
-  id         String   @id @default(cuid())
-  companyId  String
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  week       Int
-  year       Int
-  demand     Int
-  supply     Int
-  gap        Int
-  riskLevel  String   @default("CAUTION") // SAFE, CAUTION, RISK
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model PurchaseOrder {
+  id            String             @id @default(cuid())
+  companyId     String
+  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplierId    String
+  supplier      Supplier           @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  items         PurchaseOrderItem[]
+  shipments     Shipment[]
+  poNumber      String
+  poDate        DateTime           @default(now())
+  dueDate       DateTime
+  status        String             @default("DRAFT") // DRAFT, SENT, CONFIRMED, RECEIVED, CLOSED, CANCELLED
+  totalAmount   Float              @default(0)
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
-  @@unique([companyId, week, year])
   @@index([companyId])
-  @@index([week, year])
+  @@index([supplierId])
+  @@index([status])
+  @@index([dueDate])
+  @@unique([companyId, poNumber])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String       @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  sku             String
+  productName     String
+  quantity        Int
+  unitPrice       Float
+  totalPrice      Float
+  createdAt       DateTime     @default(now())
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_items")
+}
+
+model Shipment {
+  id                String   @id @default(cuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseOrderId   String?
+  purchaseOrder     PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  fromLocationId    String?
+  fromLocation      Location? @relation("ShipmentFrom", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocationId     String?
+  toLocation       Location? @relation("ShipmentTo", fields: [toLocationId], references: [id], onDelete: SetNull)
+  trackingNumber    String   @unique
+  carrier           String
+  status            String   @default("IN_TRANSIT") // IN_TRANSIT, DELAYED, DELIVERED, OUT_FOR_DELIVERY
+  estimatedDelivery DateTime
+  actualDelivery    DateTime?
+  daysLate          Int      @default(0)
+  trackingUrl       String?
+  orderInfo         String?  // JSON object with PO#, items, quantities
+  timeline          String?  // JSON array of tracking events
+  severity          Int      @default(0) // Priority for delay alerts
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([purchaseOrderId])
+  @@index([status])
+  @@index([carrier])
+  @@index([estimatedDelivery])
+  @@map("shipments")
+}
+
+model DemandForecast {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  period          String   // YYYY-MM for monthly forecasts
+  forecastQty     Int
+  actualQty       Int?
+  confidenceLevel Float    @default(0.8) // 0-1, for confidence interval
+  bestCase        Int?     // upper bound of confidence interval
+  worstCase       Int?     // lower bound of confidence interval
+  accuracyPct     Float?   // calculated after actual is known
+  scenario        String   @default("EXPECTED") // EXPECTED, BEST_CASE, WORST_CASE
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, period, scenario])
+  @@index([companyId])
+  @@index([period])
   @@map("demand_forecasts")
 }
 
@@ -121,18 +237,61 @@ model KPI {
   id         String   @id @default(cuid())
   companyId  String
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name       String   // OTIF, DIO, FILL_RATE, TURNOVER
+  name       String   // OTIF, DIO, FILL_RATE, TURNOVER, LEAD_TIME, COST_PER_UNIT
   value      Float
   trend      Float    // percentage change from previous period
   target     Float
   status     String   @default("ON_TRACK") // EXCELLENT, ON_TRACK, AT_RISK
   period     String   // e.g., "2025-01"
+  locationId String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([companyId, name, period])
+  @@unique([companyId, name, period, locationId])
   @@index([companyId])
   @@index([name])
   @@index([period])
   @@map("kpis")
+}
+
+model Issue {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type        String   // STOCKOUT, DELAY, FORECAST_MISS, QUALITY, OTHER
+  severity    Int      // 1-5, 5 being most critical
+  title       String
+  description String
+  status      String   @default("OPEN") // OPEN, ACKNOWLEDGED, RESOLVED, CLOSED
+  metadata    String?  // JSON object with related IDs (sku, supplierId, shipmentId, etc.)
+  acknowledgedAt DateTime?
+  resolvedAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([type])
+  @@index([severity])
+  @@index([status])
+  @@map("issues")
+}
+
+model InventoryMovement {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  type        String   // INBOUND, OUTBOUND, TRANSFER, ADJUSTMENT
+  quantity    Int
+  locationId  String?
+  reference   String?  // PO#, SO#, etc.
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@index([inventoryId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("inventory_movements")
 }

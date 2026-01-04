@@ -10,6 +10,7 @@
     "test": "jest",
     "seed": "ts-node src/seeds/seed.ts",
     "seed:dashboard": "ts-node src/seeds/seedDashboard.ts",
+    "seed:supplychain": "ts-node src/seeds/seedSupplyChain.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
