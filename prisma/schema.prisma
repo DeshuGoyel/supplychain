@@ -23,13 +23,116 @@ model User {
 }
 
 model Company {
-  id        String   @id @default(cuid())
-  name      String
-  industry  String   // Manufacturing, Retail, Healthcare
-  employees Int
-  users     User[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  id                String             @id @default(cuid())
+  name              String
+  industry          String   // Manufacturing, Retail, Healthcare
+  employees         Int
+  users             User[]
+  inventory         Inventory[]
+  orders            Order[]
+  suppliers         Supplier[]
+  demandForecasts   DemandForecast[]
+  kpis              KPI[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
   @@map("companies")
+}
+
+model Inventory {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sku          String
+  name         String
+  quantity     Int
+  unitCost     Float
+  stockLevel   String   @default("HEALTHY") // HEALTHY, LOW, OUT_OF_STOCK
+  turnoverRate Float?
+  lastUpdated  DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@unique([companyId, sku])
+  @@index([companyId])
+  @@index([stockLevel])
+  @@map("inventory")
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  orderNumber String
+  status      String   @default("PENDING") // PENDING, ON_TIME, DELAYED, COMPLETED
+  priority    String   @default("MEDIUM")  // LOW, MEDIUM, HIGH
+  eta         DateTime
+  daysOverdue Int      @default(0)
+  totalAmount Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("orders")
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  orders      Order[]
+  name        String
+  onTimeRate  Float    @default(0)  // percentage
+  qualityRate Float    @default(0)  // percentage
+  leadTime    Float    @default(0)  // days
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
+  issues      String?  // JSON array of issues
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@map("suppliers")
+}
+
+model DemandForecast {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  week       Int
+  year       Int
+  demand     Int
+  supply     Int
+  gap        Int
+  riskLevel  String   @default("CAUTION") // SAFE, CAUTION, RISK
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([companyId, week, year])
+  @@index([companyId])
+  @@index([week, year])
+  @@map("demand_forecasts")
+}
+
+model KPI {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name       String   // OTIF, DIO, FILL_RATE, TURNOVER
+  value      Float
+  trend      Float    // percentage change from previous period
+  target     Float
+  status     String   @default("ON_TRACK") // EXCELLENT, ON_TRACK, AT_RISK
+  period     String   // e.g., "2025-01"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([companyId, name, period])
+  @@index([companyId])
+  @@index([name])
+  @@index([period])
+  @@map("kpis")
 }
