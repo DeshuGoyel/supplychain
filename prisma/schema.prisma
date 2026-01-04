@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // bcrypt hashed
+  name      String
+  role      String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([companyId])
+  @@map("users")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  industry  String   // Manufacturing, Retail, Healthcare
+  employees Int
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("companies")
+}
