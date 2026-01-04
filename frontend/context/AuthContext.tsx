@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { User, AuthState, LoginPayload, SignupPayload, AuthResponse } from '@/types';
 import apiClient from '@/utils/api';
 import { getToken, setToken, removeToken } from '@/utils/storage';
+import { clearDashboardCache } from '@/services/dashboardService';
 
 interface AuthContextType extends AuthState {
   login: (payload: LoginPayload) => Promise<void>;
@@ -101,6 +102,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // Clear dashboard cache on logout
+    clearDashboardCache();
     removeToken();
     setState({
       user: null,

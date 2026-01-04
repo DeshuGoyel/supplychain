@@ -1,136 +1,134 @@
 // Dashboard data service
-// Now integrated with real backend API
+// Integrates with real backend API for all dashboard widgets
 
-import apiClient from '@/utils/api';
+import dashboardApi from './api/dashboardApi';
+import type {
+  InventoryData,
+  OpenOrdersData,
+  SupplierData,
+  DemandData,
+  KPIData,
+} from '@/types';
 
-export interface InventoryData {
-  totalSKUs: number;
-  stockValue: number;
-  lowStockCount: number;
-  stockHealth: number;
-  fastMovers: Array<{ sku: string; qty: number }>;
-  slowMovers: Array<{ sku: string; qty: number }>;
+// Query parameter types for API calls
+export interface InventoryQueryParams {
+  stockLevel?: 'HEALTHY' | 'LOW' | 'OUT_OF_STOCK';
+  minStockValue?: number;
+  maxStockValue?: number;
 }
 
-export interface OpenOrdersData {
-  pending: number;
-  delayed: number;
-  onTime: number;
-  orders: Array<{
-    id: string;
-    supplierId: string;
-    supplierName: string;
-    status: 'PENDING' | 'DELAYED' | 'ON_TIME';
-    eta: string;
-    daysOverdue?: number;
-    priority: 'LOW' | 'MEDIUM' | 'HIGH';
-  }>;
+export interface OrdersQueryParams {
+  status?: 'PENDING' | 'ON_TIME' | 'DELAYED' | 'COMPLETED';
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  supplierId?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
 }
 
-export interface SupplierData {
-  avgOnTime: number;
-  avgQuality: number;
-  avgLeadTime: number;
-  topSuppliers: Array<{
-    id: string;
-    name: string;
-    onTime: number;
-    quality: number;
-    leadTime: number;
-  }>;
-  underperforming: Array<{
-    id: string;
-    name: string;
-    onTime: number;
-    quality: number;
-    leadTime: number;
-    issues: string[];
-  }>;
+export interface SupplierQueryParams {
+  status?: 'ACTIVE' | 'INACTIVE';
+  minOnTimeRate?: number;
+  minQualityRate?: number;
+  maxLeadTime?: number;
 }
 
-export interface DemandData {
-  forecast: Array<{
-    week: number;
-    demand: number;
-    supply: number;
-    gap: number;
-    riskLevel: 'SAFE' | 'CAUTION' | 'RISK';
-  }>;
+export interface DemandQueryParams {
+  weeks?: number;
+  year?: number;
+  startWeek?: number;
+  riskLevel?: 'SAFE' | 'CAUTION' | 'RISK';
 }
 
-export interface KPIData {
-  otif: {
-    value: number;
-    trend: number;
-    status: 'EXCELLENT' | 'ON_TRACK' | 'AT_RISK';
-    target: number;
-  };
-  dio: {
-    value: number;
-    trend: number;
-    status: 'EXCELLENT' | 'ON_TRACK' | 'AT_RISK';
-    target: number;
-  };
-  fillRate: {
-    value: number;
-    trend: number;
-    status: 'EXCELLENT' | 'ON_TRACK' | 'AT_RISK';
-    target: number;
-  };
-  turnover: {
-    value: number;
-    trend: number;
-    status: 'EXCELLENT' | 'ON_TRACK' | 'AT_RISK';
-    target: number;
-  };
+export interface KPIQueryParams {
+  period?: string;
+  name?: 'OTIF' | 'DIO' | 'FILL_RATE' | 'TURNOVER';
 }
 
-export async function getInventoryData(): Promise<InventoryData> {
-  const response = await apiClient.get<{ success: boolean; data: InventoryData }>('/api/dashboard/inventory');
-
-  if (!response.data.success) {
-    throw new Error('Failed to fetch inventory data');
-  }
-
-  return response.data.data;
+export interface DashboardQueryParams {
+  inventory?: InventoryQueryParams;
+  orders?: OrdersQueryParams;
+  suppliers?: SupplierQueryParams;
+  demand?: DemandQueryParams;
+  kpis?: KPIQueryParams;
 }
 
-export async function getOpenOrdersData(): Promise<OpenOrdersData> {
-  const response = await apiClient.get<{ success: boolean; data: OpenOrdersData }>('/api/dashboard/orders');
+// Re-export types from API layer for convenience
+export type {
+  InventoryData,
+  OpenOrdersData,
+  SupplierData,
+  DemandData,
+  KPIData,
+};
 
-  if (!response.data.success) {
-    throw new Error('Failed to fetch orders data');
-  }
-
-  return response.data.data;
+/**
+ * Fetch inventory data for the Inventory Snapshot widget
+ * @param params - Optional query parameters for filtering
+ * @returns Promise resolving to inventory data
+ */
+export async function getInventoryData(params?: InventoryQueryParams): Promise<InventoryData> {
+  return dashboardApi.fetchInventoryData(params);
 }
 
-export async function getSupplierData(): Promise<SupplierData> {
-  const response = await apiClient.get<{ success: boolean; data: SupplierData }>('/api/dashboard/suppliers');
-
-  if (!response.data.success) {
-    throw new Error('Failed to fetch supplier data');
-  }
-
-  return response.data.data;
+/**
+ * Fetch open orders data for the Open Orders widget
+ * @param params - Optional query parameters for filtering
+ * @returns Promise resolving to open orders data
+ */
+export async function getOpenOrdersData(params?: OrdersQueryParams): Promise<OpenOrdersData> {
+  return dashboardApi.fetchOpenOrdersData(params);
 }
 
-export async function getDemandData(): Promise<DemandData> {
-  const response = await apiClient.get<{ success: boolean; data: DemandData }>('/api/dashboard/demand');
-
-  if (!response.data.success) {
-    throw new Error('Failed to fetch demand data');
-  }
-
-  return response.data.data;
+/**
+ * Fetch supplier performance data for the Supplier Performance widget
+ * @param params - Optional query parameters for filtering
+ * @returns Promise resolving to supplier data
+ */
+export async function getSupplierData(params?: SupplierQueryParams): Promise<SupplierData> {
+  return dashboardApi.fetchSupplierData(params);
 }
 
-export async function getKPIData(): Promise<KPIData> {
-  const response = await apiClient.get<{ success: boolean; data: KPIData }>('/api/dashboard/kpis');
+/**
+ * Fetch demand forecast data for the Demand vs Supply widget
+ * @param params - Optional query parameters for filtering
+ * @returns Promise resolving to demand data
+ */
+export async function getDemandData(params?: DemandQueryParams): Promise<DemandData> {
+  return dashboardApi.fetchDemandData(params);
+}
 
-  if (!response.data.success) {
-    throw new Error('Failed to fetch KPI data');
-  }
+/**
+ * Fetch KPI data for the KPI Cards widget
+ * @param params - Optional query parameters for filtering
+ * @returns Promise resolving to KPI data
+ */
+export async function getKPIData(params?: KPIQueryParams): Promise<KPIData> {
+  return dashboardApi.fetchKPIData(params);
+}
 
-  return response.data.data;
+/**
+ * Fetch all dashboard data in parallel
+ * More efficient than calling individual functions
+ * @param params - Optional query parameters for each endpoint
+ * @returns Promise resolving to all dashboard data
+ */
+export async function getAllDashboardData(
+  params?: DashboardQueryParams
+): Promise<{
+  inventory: InventoryData;
+  orders: OpenOrdersData;
+  suppliers: SupplierData;
+  demand: DemandData;
+  kpis: KPIData;
+}> {
+  return dashboardApi.fetchAllDashboardData(params);
+}
+
+/**
+ * Clear all dashboard data cache
+ * Useful after data mutations or user logout
+ */
+export function clearDashboardCache(): void {
+  dashboardApi.clearDashboardCache();
 }
