@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 
 // Import routes
 import authRoutes from './routes/auth';
+import dashboardRoutes from './routes/dashboard';
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +43,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -51,7 +53,8 @@ app.get('/', (req: Request, res: Response) => {
     status: 'running',
     endpoints: {
       health: '/api/health',
-      auth: '/api/auth'
+      auth: '/api/auth',
+      dashboard: '/api/dashboard'
     }
   });
 });
