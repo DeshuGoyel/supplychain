@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import Image from 'next/image';
 
 export default function SecuritySettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -53,8 +54,9 @@ export default function SecuritySettingsPage() {
       setQrCode(response.data.data.qrCode);
       setBackupCodes(response.data.data.backupCodes);
       setSetupMode(true);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to setup 2FA');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to setup 2FA');
     } finally {
       setLoading(false);
     }
@@ -79,8 +81,9 @@ export default function SecuritySettingsPage() {
       setTwoFactorEnabled(true);
       setSetupMode(false);
       setVerificationCode('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid verification code');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Invalid verification code');
     } finally {
       setLoading(false);
     }
@@ -107,8 +110,9 @@ export default function SecuritySettingsPage() {
 
       setSuccess('Two-factor authentication disabled');
       setTwoFactorEnabled(false);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to disable 2FA');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to disable 2FA');
     } finally {
       setLoading(false);
     }
@@ -131,8 +135,9 @@ export default function SecuritySettingsPage() {
 
       setBackupCodes(response.data.data.backupCodes);
       setSuccess('Backup codes regenerated successfully');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to regenerate backup codes');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to regenerate backup codes');
     } finally {
       setLoading(false);
     }
@@ -219,7 +224,7 @@ export default function SecuritySettingsPage() {
                 Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
               </p>
               {qrCode && (
-                <img src={qrCode} alt="QR Code" className="border p-4 bg-white" />
+                <Image src={qrCode} alt="QR Code" className="border p-4 bg-white" width={256} height={256} />
               )}
             </div>
 

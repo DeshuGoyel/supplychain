@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useWhiteLabel } from '@/hooks/useWhiteLabel';
 import { useTheme } from '@/context/ThemeContext';
 
 export default function WhiteLabelSettingsPage() {
-  const { updateTheme, setupDomain, verifyDomain, getDomainConfig, deleteDomain, loading, error: hookError } = useWhiteLabel();
+  const { updateTheme, setupDomain, verifyDomain, getDomainConfig, deleteDomain, loading } = useWhiteLabel();
   const { theme, refreshTheme } = useTheme();
   
   const [formData, setFormData] = useState({
@@ -21,9 +22,18 @@ export default function WhiteLabelSettingsPage() {
   });
 
   const [domain, setDomain] = useState('');
-  const [domainConfig, setDomainConfig] = useState<any>(null);
+  const [domainConfig, setDomainConfig] = useState<{ domain: string; status: string; verifiedAt?: string; expiresAt?: string; cnameRecord?: { host: string; value: string; type: string } } | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const loadDomainConfig = async () => {
+    try {
+      const config = await getDomainConfig();
+      setDomainConfig(config);
+    } catch {
+      // No domain configured
+    }
+  };
 
   useEffect(() => {
     if (theme) {
@@ -40,16 +50,8 @@ export default function WhiteLabelSettingsPage() {
       });
     }
     loadDomainConfig();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
-
-  const loadDomainConfig = async () => {
-    try {
-      const config = await getDomainConfig();
-      setDomainConfig(config);
-    } catch (err) {
-      // No domain configured
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,8 +62,9 @@ export default function WhiteLabelSettingsPage() {
       await updateTheme(formData);
       await refreshTheme();
       setSuccess('White-label configuration updated successfully!');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
     }
   };
 
@@ -73,8 +76,9 @@ export default function WhiteLabelSettingsPage() {
       const result = await setupDomain(domain);
       setDomainConfig(result);
       setSuccess('Domain setup initiated! Please add the CNAME record to your DNS provider.');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
     }
   };
 
@@ -86,8 +90,9 @@ export default function WhiteLabelSettingsPage() {
       const result = await verifyDomain();
       setDomainConfig(result);
       setSuccess('Domain verified successfully! SSL certificate has been provisioned.');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
     }
   };
 
@@ -104,8 +109,9 @@ export default function WhiteLabelSettingsPage() {
       setDomainConfig(null);
       setDomain('');
       setSuccess('Custom domain removed successfully');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
     }
   };
 
@@ -273,7 +279,7 @@ export default function WhiteLabelSettingsPage() {
                 className="h-4 w-4 text-blue-600 rounded"
               />
               <label htmlFor="removedBranding" className="ml-2 text-sm text-gray-700">
-                Remove "Powered by" branding
+                Remove &quot;Powered by&quot; branding
               </label>
             </div>
 
@@ -384,7 +390,7 @@ export default function WhiteLabelSettingsPage() {
             <h2 className="text-xl font-semibold mb-4">Preview</h2>
             <div className="border rounded-lg p-4 space-y-3">
               {formData.logoUrl && (
-                <img src={formData.logoUrl} alt="Logo Preview" className="h-12" />
+                <Image src={formData.logoUrl} alt="Logo Preview" className="h-12" width={200} height={48} style={{ objectFit: 'contain' }} />
               )}
               <div>
                 <h3 className="font-semibold" style={{ color: formData.primaryColor, fontFamily: formData.fontFamily }}>
