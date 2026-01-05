@@ -2,8 +2,30 @@
 
 A robust Express.js backend with PostgreSQL database, JWT authentication, and comprehensive user management for the Supply Chain AI Control Assistant MVP.
 
+---
+
+## ⚡ Quick Start (TL;DR)
+
+**Start everything in one command:**
+```bash
+./start-all.sh
+```
+
+**Login with demo account:**
+- URL: http://localhost:3000/auth/login
+- Email: `manager@acme.com`
+- Password: `demo123`
+
+**📚 Read this first:** [`QUICK_START.md`](QUICK_START.md)
+
+**✅ System Status:** Sign In & Sign Up are **working perfectly!**  
+See [`STATUS_REPORT.md`](STATUS_REPORT.md) for full system status.
+
+---
+
 ## 🚀 Features
 
+### Core Features
 - **Express.js API Server** with TypeScript support
 - **PostgreSQL Database** with Prisma ORM
 - **JWT Authentication** with role-based access control
@@ -12,6 +34,16 @@ A robust Express.js backend with PostgreSQL database, JWT authentication, and co
 - **Seed Data** for development and testing
 - **API Documentation** with Postman collection
 - **Environment Configuration** with secure defaults
+
+### Phase 5: Enterprise & White-Label ✨ NEW!
+- **White-Label Branding** - Custom logos, colors, fonts, domains
+- **Two-Factor Authentication (2FA)** - TOTP with backup codes
+- **SAML 2.0 SSO** - Enterprise single sign-on
+- **Audit Logging** - Track all admin actions
+- **Legal Documents** - Terms, Privacy Policy, DPA, SLA, AUP
+- **Security Headers** - CSP, HSTS, and more
+- **Custom Domains** - With SSL certificate support
+- **Enterprise Agreements** - MSA and DPA management
 
 ## 📋 Prerequisites
 
