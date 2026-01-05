@@ -39,6 +39,19 @@ export const comparePassword = async (password: string, hash: string): Promise<b
 export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
   
+  // Handle null, undefined, or non-string inputs
+  if (!password || typeof password !== 'string') {
+    errors.push('Password must be at least 8 characters long');
+    errors.push('Password must contain at least one uppercase letter');
+    errors.push('Password must contain at least one lowercase letter');
+    errors.push('Password must contain at least one number');
+    errors.push('Password must contain at least one special character');
+    return {
+      isValid: false,
+      errors
+    };
+  }
+  
   if (password.length < 8) {
     errors.push('Password must be at least 8 characters long');
   }
