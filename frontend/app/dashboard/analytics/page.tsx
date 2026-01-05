@@ -3,15 +3,13 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/utils/api';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import Alert from '@/components/ui/Alert';
+import Card from '@/components/Common/Card';
+import Button from '@/components/Common/Button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<'otif' | 'inventory' | 'suppliers' | 'leadtime' | 'cost'>('otif');
 
-  const { data: kpis } = useSWR('/api/analytics/kpis', fetcher);
   const { data: otifData } = useSWR(activeTab === 'otif' ? '/api/analytics/otif?months=12' : null, fetcher);
   const { data: turnsData } = useSWR(activeTab === 'inventory' ? '/api/analytics/turns' : null, fetcher);
   const { data: suppliersData } = useSWR(activeTab === 'suppliers' ? '/api/analytics/suppliers' : null, fetcher);
@@ -174,13 +172,11 @@ export default function AnalyticsPage() {
                       data={turnsData.data.byLocation}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
-                      label={(entry) => `${entry.location}: ${entry.percentage}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="percentage"
                     >
-                      {turnsData.data.byLocation.map((entry: any, index: number) => (
+                      {turnsData.data.byLocation.map((entry: { name: string; value: number }, index: number) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -221,7 +217,7 @@ export default function AnalyticsPage() {
               <div className="p-6">
                 <h2 className="text-xl font-semibold mb-4">Top Performers</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {suppliersData.data.topPerformers.map((supplier: any) => (
+                  {suppliersData.data.topPerformers.map((supplier: { id: string; name: string; score: number }) => (
                     <div key={supplier.id} className="p-4 bg-green-50 rounded-lg">
                       <p className="font-semibold text-gray-900">{supplier.name}</p>
                       <p className="text-sm text-gray-600">Score: {supplier.score}</p>

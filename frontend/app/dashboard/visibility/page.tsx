@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/utils/api';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import Alert from '@/components/ui/Alert';
+import Card from '@/components/Common/Card';
+import Button from '@/components/Common/Button';
+import Alert from '@/components/Common/Alert';
 
 export default function VisibilityPage() {
   const [page, setPage] = useState(1);
@@ -89,7 +89,20 @@ export default function VisibilityPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {shipments.map((shipment: any) => (
+              {shipments.map((shipment: { 
+                id: string; 
+                trackingNumber: string; 
+                carrier: string; 
+                status: string; 
+                fromLocation: string; 
+                toLocation: string; 
+                eta: string; 
+                isDelayed: boolean; 
+                daysLate: number;
+                orderReference?: string;
+                totalValue?: number;
+                items?: Array<{ name?: string; sku: string; quantity: number }>;
+              }) => (
                 <>
                   <tr 
                     key={shipment.id}
@@ -145,7 +158,7 @@ export default function VisibilityPage() {
                             <div>
                               <h4 className="text-sm font-medium text-gray-900 mb-2">Items</h4>
                               <ul className="list-disc list-inside text-sm text-gray-600">
-                                {shipment.items.map((item: any, idx: number) => (
+                                {shipment.items.map((item: { name?: string; sku: string; quantity: number }, idx: number) => (
                                   <li key={idx}>{item.name || item.sku} - Qty: {item.quantity}</li>
                                 ))}
                               </ul>
@@ -191,7 +204,7 @@ export default function VisibilityPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {carriers.map((carrier: any, idx: number) => (
+                  {carriers.map((carrier: { carrier: string; onTimeRate: number; avgDaysLate: number; totalShipments?: number }, idx: number) => (
                     <tr key={idx}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {carrier.carrier}

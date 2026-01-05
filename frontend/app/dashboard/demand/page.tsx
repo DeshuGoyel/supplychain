@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/utils/api';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import Alert from '@/components/ui/Alert';
+import Card from '@/components/Common/Card';
+import Button from '@/components/Common/Button';
+import Alert from '@/components/Common/Alert';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DemandPage() {
@@ -92,7 +92,7 @@ export default function DemandPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {forecastData.map((item: any, idx: number) => (
+                {forecastData.map((item: { month: string; demand: number; supply: number; gap: number; riskLevel: string }, idx: number) => (
                   <tr key={idx}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.month}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.demand}</td>
