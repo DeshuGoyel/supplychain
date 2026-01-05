@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -23,38 +23,58 @@ model User {
 }
 
 model Company {
-  id                String             @id @default(cuid())
-  name              String
-  industry          String   // Manufacturing, Retail, Healthcare
-  employees         Int
-  users             User[]
-  inventory         Inventory[]
-  orders            Order[]
-  suppliers         Supplier[]
-  demandForecasts   DemandForecast[]
-  kpis              KPI[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                    String             @id @default(cuid())
+  name                  String
+  industry              String   // Manufacturing, Retail, Healthcare
+  employees             Int
+  subscriptionStatus    String?  @default("trial") // trial, active, inactive, cancelled
+  subscriptionTier      String?  @default("starter") // starter, growth, enterprise
+  trialStart            DateTime?
+  trialEnd              DateTime?
+  nextBillingDate       DateTime?
+  stripeCustomerId      String?  @unique
+  stripeSubscriptionId  String?  @unique
+  users                 User[]
+  inventory             Inventory[]
+  orders                Order[]
+  suppliers             Supplier[]
+  demandForecasts       DemandForecast[]
+  kpis                  KPI[]
+  locations             Location[]
+  purchaseOrders        PurchaseOrder[]
+  shipments             Shipment[]
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   @@map("companies")
 }
 
 model Inventory {
-  id           String   @id @default(cuid())
-  companyId    String
-  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  sku          String
-  name         String
-  quantity     Int
-  unitCost     Float
-  stockLevel   String   @default("HEALTHY") // HEALTHY, LOW, OUT_OF_STOCK
-  turnoverRate Float?
-  lastUpdated  DateTime @updatedAt
-  createdAt    DateTime @default(now())
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  locationId    String?
+  location      Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  sku           String
+  name          String
+  quantity      Int
+  quantityReserved Int    @default(0)
+  unitCost      Float
+  stockLevel    String    @default("HEALTHY") // HEALTHY, LOW, OUT_OF_STOCK
+  turnoverRate  Float?
+  reorderPoint  Int?
+  reorderQty    Int?
+  safetyStock   Int?
+  supplierId    String?
+  supplier      Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  lastUpdated   DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
 
-  @@unique([companyId, sku])
+  @@unique([companyId, sku, locationId])
   @@index([companyId])
+  @@index([locationId])
   @@index([stockLevel])
+  @@index([supplierId])
   @@map("inventory")
 }
 
@@ -80,18 +100,26 @@ model Order {
 }
 
 model Supplier {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  orders      Order[]
-  name        String
-  onTimeRate  Float    @default(0)  // percentage
-  qualityRate Float    @default(0)  // percentage
-  leadTime    Float    @default(0)  // days
-  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
-  issues      String?  // JSON array of issues
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String          @id @default(cuid())
+  companyId       String
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  orders          Order[]
+  inventory       Inventory[]
+  purchaseOrders  PurchaseOrder[]
+  name            String
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  address         String?
+  onTimeRate      Float           @default(0)  // percentage
+  qualityRate     Float           @default(0)  // percentage
+  leadTime        Float           @default(0)  // days
+  performanceScore Float          @default(0)  // 0-100
+  paymentTerms    String?         // e.g., "Net 30"
+  status          String          @default("ACTIVE") // ACTIVE, INACTIVE
+  issues          String?         // JSON array of issues
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([companyId])
   @@index([status])
@@ -135,4 +163,106 @@ model KPI {
   @@index([name])
   @@index([period])
   @@map("kpis")
+}
+
+model Location {
+  id          String      @id @default(cuid())
+  companyId   String
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  type        String      // WAREHOUSE, RETAIL, SUPPLIER, DISTRIBUTION_CENTER
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  zipCode     String?
+  capacity    Int?
+  inventory   Inventory[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([companyId])
+  @@index([type])
+  @@map("locations")
+}
+
+model PurchaseOrder {
+  id          String        @id @default(cuid())
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplierId  String
+  supplier    Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  poNumber    String
+  status      String        @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, IN_TRANSIT, RECEIVED, CANCELLED
+  totalAmount Float         @default(0)
+  dueDate     DateTime?
+  receivedDate DateTime?
+  notes       String?
+  lineItems   POLineItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([companyId, poNumber])
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model POLineItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  sku             String
+  productName     String
+  quantity        Int
+  unitPrice       Float
+  totalPrice      Float
+  receivedQty     Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([purchaseOrderId])
+  @@map("po_line_items")
+}
+
+model Shipment {
+  id              String              @id @default(cuid())
+  companyId       String
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trackingNumber  String
+  carrier         String
+  status          String              @default("PENDING") // PENDING, PICKED, SHIPPED, IN_TRANSIT, DELIVERED, DELAYED, CANCELLED
+  fromLocation    String
+  toLocation      String
+  eta             DateTime?
+  actualDelivery  DateTime?
+  daysLate        Int                 @default(0)
+  orderReference  String?
+  totalValue      Float?
+  items           String?             // JSON array of items
+  timeline        ShipmentTimeline[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([companyId, trackingNumber])
+  @@index([companyId])
+  @@index([status])
+  @@index([carrier])
+  @@map("shipments")
+}
+
+model ShipmentTimeline {
+  id          String    @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status      String    // PICKED, SHIPPED, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, EXCEPTION
+  location    String?
+  notes       String?
+  timestamp   DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([shipmentId])
+  @@index([timestamp])
+  @@map("shipment_timeline")
 }
