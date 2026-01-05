@@ -318,7 +318,7 @@ export const getCostAnalytics = async (req: any, res: Response, next: NextFuncti
 
     const bySupplier = Object.keys(supplierCosts).map(name => ({
       supplier: name,
-      cost: Math.round(supplierCosts[name])
+      cost: Math.round(supplierCosts[name] || 0)
     })).sort((a, b) => b.cost - a.cost);
 
     const trend = Math.random() > 0.5 ? 'increasing' : 'decreasing';

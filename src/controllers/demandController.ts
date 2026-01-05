@@ -182,7 +182,7 @@ export const createScenario = async (req: any, res: Response, next: NextFunction
       const month = ((targetMonth - 1) % 12) + 1;
       const period = `${year}-${String(month).padStart(2, '0')}`;
 
-      const baseDemand = (10000 + Math.random() * 5000) * multiplier;
+      const baseDemand = (10000 + Math.random() * 5000) * (multiplier || 1.0);
       const baseSupply = baseDemand * (0.95 + Math.random() * 0.1);
       
       forecasts.push({

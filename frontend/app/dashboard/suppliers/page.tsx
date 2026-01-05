@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/utils/api';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import Alert from '@/components/ui/Alert';
+import Card from '@/components/Common/Card';
+import Button from '@/components/Common/Button';
+import Alert from '@/components/Common/Alert';
 
 interface Supplier {
   id: string;

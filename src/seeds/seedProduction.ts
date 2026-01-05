@@ -147,6 +147,10 @@ async function main() {
     const safetyStock = Math.floor(quantity * 0.2);
     const stockLevel = quantity <= reorderPoint ? 'LOW' : quantity === 0 ? 'OUT_OF_STOCK' : 'HEALTHY';
 
+    if (!location || !supplier) {
+      continue;
+    }
+
     inventoryItems.push(
       prisma.inventory.create({
         data: {
@@ -154,7 +158,7 @@ async function main() {
           locationId: location.id,
           supplierId: supplier.id,
           sku: `SKU-${String(i + 1).padStart(5, '0')}`,
-          name: skuNames[i % skuNames.length],
+          name: skuNames[i % skuNames.length] || `Product ${i + 1}`,
           quantity,
           quantityReserved: Math.floor(Math.random() * 50),
           unitCost: parseFloat((Math.random() * 100 + 10).toFixed(2)),
@@ -177,13 +181,17 @@ async function main() {
     const status = ['DRAFT', 'SUBMITTED', 'APPROVED', 'IN_TRANSIT', 'RECEIVED'][i % 5];
     const dueDate = new Date(Date.now() + (Math.random() * 30 + 7) * 24 * 60 * 60 * 1000);
 
+    if (!supplier) {
+      continue;
+    }
+
     pos.push(
       prisma.purchaseOrder.create({
         data: {
           companyId: company.id,
           supplierId: supplier.id,
           poNumber: `PO-${String(i + 1).padStart(6, '0')}`,
-          status,
+          status: status || 'DRAFT',
           totalAmount: parseFloat((Math.random() * 50000 + 10000).toFixed(2)),
           dueDate,
           notes: `Purchase order for ${supplier.name}`,
@@ -211,8 +219,8 @@ async function main() {
         data: {
           companyId: company.id,
           trackingNumber: `TRK-${String(i + 1).padStart(10, '0')}`,
-          carrier: carriers[i % carriers.length],
-          status: isDelayed ? 'DELAYED' : status,
+          carrier: carriers[i % carriers.length] || 'FedEx',
+          status: (isDelayed ? 'DELAYED' : status) || 'PENDING',
           fromLocation: locations[0].name,
           toLocation: locations[1].name,
           eta: isDelayed ? new Date(eta.getTime() - daysLate * 24 * 60 * 60 * 1000) : eta,
