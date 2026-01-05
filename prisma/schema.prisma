@@ -8,15 +8,17 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // bcrypt hashed
-  name      String
-  role      String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String         // bcrypt hashed
+  name          String
+  role          String         @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
+  companyId     String
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  twoFactorAuth TwoFactorAuth?
+  auditLogs     AuditLog[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   
   @@index([companyId])
   @@map("users")
@@ -43,6 +45,12 @@ model Company {
   locations             Location[]
   purchaseOrders        PurchaseOrder[]
   shipments             Shipment[]
+  whiteLabelConfig      WhiteLabelConfig?
+  emailTemplates        EmailTemplate[]
+  customDomainConfig    CustomDomainConfig?
+  samlConfig            SAMLConfig?
+  auditLogs             AuditLog[]
+  enterpriseAgreements  EnterpriseAgreement[]
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -265,4 +273,134 @@ model ShipmentTimeline {
   @@index([shipmentId])
   @@index([timestamp])
   @@map("shipment_timeline")
+}
+
+model WhiteLabelConfig {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customDomain    String?
+  logoUrl         String?
+  faviconUrl      String?
+  primaryColor    String   @default("#3B82F6")
+  secondaryColor  String   @default("#10B981")
+  fontFamily      String   @default("Inter, sans-serif")
+  headerText      String   @default("Supply Chain Control")
+  footerText      String   @default("Powered by Supply Chain AI")
+  removedBranding Boolean  @default(false)
+  customHelpCenterUrl String?
+  status          String   @default("active") // active, inactive
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("white_label_configs")
+}
+
+model EmailTemplate {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  templateType   String   // invoice, welcome, alert, receipt, trial_expiration, upgrade_confirmation
+  customLogoUrl  String?
+  customFooter   String?
+  brandColor     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([companyId, templateType])
+  @@index([companyId])
+  @@index([templateType])
+  @@map("email_templates")
+}
+
+model CustomDomainConfig {
+  id                String    @id @default(cuid())
+  companyId         String    @unique
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  domain            String    @unique
+  status            String    @default("pending") // pending, active, expired, failed
+  sslCertificate    String?
+  verificationCode  String
+  verifiedAt        DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([domain])
+  @@index([status])
+  @@map("custom_domain_configs")
+}
+
+model SAMLConfig {
+  id          String   @id @default(cuid())
+  companyId   String   @unique
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  idpUrl      String   // Identity Provider URL
+  certificate String   // X.509 certificate
+  entityId    String   // SAML Entity ID
+  status      String   @default("active") // active, inactive
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@map("saml_configs")
+}
+
+model TwoFactorAuth {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret      String   // Encrypted TOTP secret
+  backupCodes String   // JSON array of encrypted backup codes
+  enabled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([enabled])
+  @@map("two_factor_auth")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String   // CREATE, UPDATE, DELETE, LOGIN, EXPORT, CONFIG_CHANGE
+  resource   String   // User, Invoice, Config, WhiteLabel, Domain
+  resourceId String?
+  changes    String?  // JSON object
+  ipAddress  String?
+  userAgent  String?
+  timestamp  DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model EnterpriseAgreement {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  agreementType String    // MSA (Master Service Agreement), DPA (Data Processing Agreement)
+  status        String    @default("pending") // pending, signed, expired
+  pdfUrl        String?
+  signedDate    DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([agreementType])
+  @@index([status])
+  @@map("enterprise_agreements")
 }

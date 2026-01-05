@@ -5,6 +5,7 @@ import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import { securityHeaders, enforceHTTPS } from './middleware/security';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -15,6 +16,9 @@ import purchaseOrderRoutes from './routes/purchaseOrders';
 import shipmentRoutes from './routes/shipments';
 import demandRoutes from './routes/demand';
 import analyticsRoutes from './routes/analytics';
+import whiteLabelRoutes from './routes/whiteLabel';
+import legalRoutes from './routes/legal';
+import securityRoutes from './routes/security';
 
 // Load environment variables
 dotenv.config();
@@ -35,6 +39,10 @@ app.use(cors({
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Security middleware
+app.use(securityHeaders);
+app.use(enforceHTTPS);
 
 // Request logging middleware
 app.use(requestLogger);
@@ -76,6 +84,9 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/demand', demandRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/white-label', whiteLabelRoutes);
+app.use('/api/legal', legalRoutes);
+app.use('/api/security', securityRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -92,7 +103,10 @@ app.get('/', (req: Request, res: Response) => {
       purchaseOrders: '/api/purchase-orders',
       shipments: '/api/shipments',
       demand: '/api/demand',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      whiteLabel: '/api/white-label',
+      legal: '/api/legal',
+      security: '/api/security'
     }
   });
 });
