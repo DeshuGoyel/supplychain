@@ -10,7 +10,12 @@ import {
   Settings, 
   ChevronLeft,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  Package,
+  Users,
+  TrendingUp,
+  MapPin,
+  PieChart
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/components/Common/Button';
@@ -28,6 +33,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, 
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+    { name: 'Inventory', icon: Package, href: '/dashboard/inventory' },
+    { name: 'Suppliers', icon: Users, href: '/dashboard/suppliers' },
+    { name: 'Demand Planning', icon: TrendingUp, href: '/dashboard/demand' },
+    { name: 'Visibility', icon: MapPin, href: '/dashboard/visibility' },
+    { name: 'Analytics', icon: PieChart, href: '/dashboard/analytics' },
     { name: 'Issues', icon: AlertCircle, href: '/dashboard/issues' },
     { name: 'Reports', icon: BarChart3, href: '/dashboard/reports' },
     { name: 'Settings', icon: Settings, href: '/dashboard/settings' },

@@ -3,10 +3,18 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
+import { globalRateLimiter } from './middleware/rateLimiter';
+import { requestLogger } from './middleware/requestLogger';
 
 // Import routes
 import authRoutes from './routes/auth';
 import dashboardRoutes from './routes/dashboard';
+import inventoryRoutes from './routes/inventory';
+import supplierRoutes from './routes/suppliers';
+import purchaseOrderRoutes from './routes/purchaseOrders';
+import shipmentRoutes from './routes/shipments';
+import demandRoutes from './routes/demand';
+import analyticsRoutes from './routes/analytics';
 
 // Load environment variables
 dotenv.config();
@@ -28,22 +36,46 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Request logging middleware
+app.use(requestLogger);
+
+// Rate limiting middleware
+app.use(globalRateLimiter);
+
 // Passport middleware
 app.use(passport.initialize());
 
-// Health check endpoint
-app.get('/api/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    version: '1.0.0'
-  });
+// Health check endpoint with DB connection test
+app.get('/api/health', async (req: Request, res: Response) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.0',
+      database: 'connected'
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.0',
+      database: 'disconnected'
+    });
+  }
 });
 
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/shipments', shipmentRoutes);
+app.use('/api/demand', demandRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -54,7 +86,13 @@ app.get('/', (req: Request, res: Response) => {
     endpoints: {
       health: '/api/health',
       auth: '/api/auth',
-      dashboard: '/api/dashboard'
+      dashboard: '/api/dashboard',
+      inventory: '/api/inventory',
+      suppliers: '/api/suppliers',
+      purchaseOrders: '/api/purchase-orders',
+      shipments: '/api/shipments',
+      demand: '/api/demand',
+      analytics: '/api/analytics'
     }
   });
 });
