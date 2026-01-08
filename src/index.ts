@@ -3,8 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
+import helmet from 'helmet';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import { securityHeaders, contentSecurityPolicy } from './middleware/security';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -15,6 +17,10 @@ import purchaseOrderRoutes from './routes/purchaseOrders';
 import shipmentRoutes from './routes/shipments';
 import demandRoutes from './routes/demand';
 import analyticsRoutes from './routes/analytics';
+import whiteLabelRoutes from './routes/whiteLabel';
+import ssoRoutes from './routes/sso';
+import legalRoutes from './routes/legal';
+import auditLogsRoutes from './routes/auditLogs';
 
 // Load environment variables
 dotenv.config();
@@ -35,6 +41,11 @@ app.use(cors({
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Security headers
+app.use(helmet());
+app.use(securityHeaders);
+app.use(contentSecurityPolicy);
 
 // Request logging middleware
 app.use(requestLogger);
@@ -76,6 +87,10 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/demand', demandRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/white-label', whiteLabelRoutes);
+app.use('/api/sso', ssoRoutes);
+app.use('/api/legal', legalRoutes);
+app.use('/api/audit-logs', auditLogsRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -92,7 +107,11 @@ app.get('/', (req: Request, res: Response) => {
       purchaseOrders: '/api/purchase-orders',
       shipments: '/api/shipments',
       demand: '/api/demand',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      whiteLabel: '/api/white-label',
+      sso: '/api/sso',
+      legal: '/api/legal',
+      auditLogs: '/api/audit-logs'
     }
   });
 });
