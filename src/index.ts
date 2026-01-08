@@ -15,6 +15,13 @@ import purchaseOrderRoutes from './routes/purchaseOrders';
 import shipmentRoutes from './routes/shipments';
 import demandRoutes from './routes/demand';
 import analyticsRoutes from './routes/analytics';
+import billingRoutes from './routes/billing';
+import referralRoutes from './routes/referral';
+import revenueAnalyticsRoutes from './routes/revenueAnalytics';
+import twoFactorRoutes from './routes/twoFactor';
+import whiteLabelRoutes from './routes/whiteLabel';
+import auditLogRoutes from './routes/auditLog';
+import legalRoutes from './routes/legal';
 
 // Load environment variables
 dotenv.config();
@@ -76,6 +83,13 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/demand', demandRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/referral', referralRoutes);
+app.use('/api/revenue-analytics', revenueAnalyticsRoutes);
+app.use('/api/2fa', twoFactorRoutes);
+app.use('/api/white-label', whiteLabelRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/legal', legalRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -92,7 +106,14 @@ app.get('/', (req: Request, res: Response) => {
       purchaseOrders: '/api/purchase-orders',
       shipments: '/api/shipments',
       demand: '/api/demand',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      billing: '/api/billing',
+      referral: '/api/referral',
+      revenueAnalytics: '/api/revenue-analytics',
+      twoFactor: '/api/2fa',
+      whiteLabel: '/api/white-label',
+      auditLogs: '/api/audit-logs',
+      legal: '/api/legal'
     }
   });
 });

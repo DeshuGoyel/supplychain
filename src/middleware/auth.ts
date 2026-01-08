@@ -135,3 +135,6 @@ export const requireRole = (allowedRoles: string[]) => {
     next();
   };
 };
+
+// Export alias for convenience
+export const authenticate = authMiddleware;
