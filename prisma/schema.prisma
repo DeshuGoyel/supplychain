@@ -266,3 +266,190 @@ model ShipmentTimeline {
   @@index([timestamp])
   @@map("shipment_timeline")
 }
+
+// Billing & Subscription Models
+model Subscription {
+  id                   String    @id @default(cuid())
+  companyId            String    @unique
+  stripeSubscriptionId String    @unique
+  stripePriceId        String
+  tier                 String    // starter, growth, enterprise
+  status               String    // active, inactive, cancelled, past_due
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id               String   @id @default(cuid())
+  companyId        String
+  stripeInvoiceId  String   @unique
+  amount           Float
+  currency         String   @default("usd")
+  status           String   // paid, open, void, uncollectible
+  pdfUrl           String?
+  invoiceNumber    String?
+  dueDate          DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model UsageRecord {
+  id        String   @id @default(cuid())
+  companyId String
+  metric    String   // apiCalls, storage, users, reports, exports
+  quantity  Float
+  period    String   // e.g., "2025-01"
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([companyId, period])
+  @@index([metric])
+  @@map("usage_records")
+}
+
+// Referral Program Models
+model ReferralProgram {
+  id             String   @id @default(cuid())
+  companyId      String   @unique
+  referralCode   String   @unique
+  totalReferrals Int      @default(0)
+  creditEarned   Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([referralCode])
+  @@map("referral_programs")
+}
+
+model ReferralConversion {
+  id                String   @id @default(cuid())
+  referralCode      String
+  referredCompanyId String   @unique
+  creditApplied     Float    @default(0)
+  status            String   // pending, approved, paid
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([referralCode])
+  @@index([status])
+  @@map("referral_conversions")
+}
+
+// White-Label & Enterprise Models
+model WhiteLabelConfig {
+  id                   String   @id @default(cuid())
+  companyId            String   @unique
+  customDomain         String?
+  logoUrl              String?
+  faviconUrl           String?
+  primaryColor         String   @default("#3B82F6")
+  secondaryColor       String   @default("#10B981")
+  accentColor          String?
+  fontFamily           String   @default("Inter")
+  customHeaderText     String?
+  customFooterText     String?
+  removeBranding       Boolean  @default(false)
+  customHelpCenterUrl  String?
+  customCss            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("white_label_configs")
+}
+
+model SAMLConfig {
+  id          String   @id @default(cuid())
+  companyId   String   @unique
+  enabled     Boolean  @default(false)
+  idpUrl      String
+  certificate String   // X.509 certificate
+  entityId    String
+  acsUrl      String?  // Assertion Consumer Service URL
+  sloUrl      String?  // Single Logout URL
+  status      String   @default("inactive") // active, inactive
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("saml_configs")
+}
+
+model TwoFactorAuth {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  secret      String   // TOTP secret (encrypted)
+  backupCodes String   // JSON array of backup codes (encrypted)
+  enabled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("two_factor_auth")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String?
+  action      String   // CREATE, UPDATE, DELETE, LOGIN, EXPORT, etc.
+  resource    String   // User, Inventory, Order, etc.
+  resourceId  String?
+  changes     String?  // JSON object with before/after values
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model EmailPreferences {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  receiveEmails   Boolean  @default(true)
+  emailFrequency  String   @default("weekly") // daily, weekly, monthly, never
+  announcements   Boolean  @default(true)
+  productUpdates  Boolean  @default(true)
+  tips            Boolean  @default(true)
+  caseStudies     Boolean  @default(true)
+  newsletters     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("email_preferences")
+}
+
+// Analytics & Metrics Models
+model RevenueMetric {
+  id           String   @id @default(cuid())
+  period       String   // e.g., "2025-01"
+  mrr          Float    @default(0) // Monthly Recurring Revenue
+  arr          Float    @default(0) // Annual Recurring Revenue
+  newMrr       Float    @default(0)
+  expansionMrr Float    @default(0)
+  churnMrr     Float    @default(0)
+  activeUsers  Int      @default(0)
+  newSignups   Int      @default(0)
+  churnCount   Int      @default(0)
+  churnRate    Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([period])
+  @@index([period])
+  @@map("revenue_metrics")
+}
