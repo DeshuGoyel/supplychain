@@ -92,11 +92,20 @@ export const signup = async (req: Request<{}, {}, SignupRequestBody>, res: Respo
 
     // Create company and user in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Calculate trial dates
+      const trialStart = new Date();
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 14);
+
       const company = await tx.company.create({
         data: {
           name: companyName,
           industry,
-          employees: 1
+          employees: 1,
+          subscriptionStatus: 'trial',
+          subscriptionTier: 'starter',
+          trialStart,
+          trialEnd
         }
       });
 
@@ -107,6 +116,15 @@ export const signup = async (req: Request<{}, {}, SignupRequestBody>, res: Respo
           name,
           role: 'MANAGER', // First user becomes manager by default
           companyId: company.id
+        }
+      });
+
+      // Create referral program
+      const referralCode = `${companyName.replace(/\s+/g, '-').toLowerCase()}-${Math.random().toString(36).substring(7)}`;
+      await tx.referralProgram.create({
+        data: {
+          companyId: company.id,
+          referralCode
         }
       });
 

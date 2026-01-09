@@ -15,6 +15,14 @@ import purchaseOrderRoutes from './routes/purchaseOrders';
 import shipmentRoutes from './routes/shipments';
 import demandRoutes from './routes/demand';
 import analyticsRoutes from './routes/analytics';
+import billingRoutes from './routes/billing';
+import referralRoutes from './routes/referral';
+import twoFactorRoutes from './routes/twoFactor';
+import whiteLabelRoutes from './routes/whiteLabel';
+import adminAnalyticsRoutes from './routes/adminAnalytics';
+import auditLogsRoutes from './routes/auditLogs';
+import legalRoutes from './routes/legal';
+import marketingRoutes from './routes/marketing';
 
 // Load environment variables
 dotenv.config();
@@ -31,6 +39,28 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Security headers
+app.use((req: Request, res: Response, next: any) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+
+    const proto = (req.headers['x-forwarded-proto'] as string) || '';
+    if (proto && proto !== 'https') {
+      return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+    }
+  }
+
+  next();
+});
+
+// Stripe webhook requires raw body
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -69,6 +99,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/2fa', twoFactorRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/suppliers', supplierRoutes);
@@ -76,6 +107,13 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/demand', demandRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/analytics', adminAnalyticsRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/referral', referralRoutes);
+app.use('/api/white-label', whiteLabelRoutes);
+app.use('/api/audit-logs', auditLogsRoutes);
+app.use('/api/legal', legalRoutes);
+app.use('/api/marketing', marketingRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -92,7 +130,12 @@ app.get('/', (req: Request, res: Response) => {
       purchaseOrders: '/api/purchase-orders',
       shipments: '/api/shipments',
       demand: '/api/demand',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      billing: '/api/billing',
+      referral: '/api/referral',
+      whiteLabel: '/api/white-label',
+      auditLogs: '/api/audit-logs',
+      legal: '/api/legal'
     }
   });
 });
