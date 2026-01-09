@@ -5,6 +5,7 @@ import ProtectedRoute from '@/components/Auth/ProtectedRoute';
 import Header from '@/components/Dashboard/Header';
 import Sidebar from '@/components/Dashboard/Sidebar';
 import { cn } from '@/components/Common/Button';
+import { useTheme } from '@/context/ThemeContext';
 
 export default function DashboardLayout({
   children,
@@ -13,6 +14,14 @@ export default function DashboardLayout({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme } = useTheme();
+
+  const year = new Date().getFullYear();
+  const footerCopy = theme.footerText
+    ? theme.footerText
+    : theme.removedBranding
+      ? 'All rights reserved.'
+      : 'SCACA - Supply Chain AI Control Assistant. All rights reserved.';
 
   return (
     <ProtectedRoute>
@@ -30,7 +39,7 @@ export default function DashboardLayout({
         )}>
           <Header 
             onMenuClick={() => setMobileOpen(true)} 
-            title="Supply Chain AI Control"
+            title={theme.headerText || "Supply Chain AI Control"}
           />
           
           <main className="flex-1 p-4 md:p-6 lg:p-8">
@@ -40,7 +49,7 @@ export default function DashboardLayout({
           </main>
           
           <footer className="py-4 px-6 bg-white border-t border-gray-200 text-center text-xs text-gray-400">
-            &copy; {new Date().getFullYear()} SCACA - Supply Chain AI Control Assistant. All rights reserved.
+            &copy; {year} {footerCopy}
           </footer>
         </div>
       </div>

@@ -33,13 +33,23 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
 
     // Verify and decode the token
     const decoded = verifyToken(token);
+
+    if (decoded.twoFactorPending) {
+      res.status(401).json({
+        success: false,
+        message: 'Two-factor authentication required',
+        code: 'TWO_FACTOR_REQUIRED'
+      });
+      return;
+    }
     
     // Attach user information to request object
     (req as any).user = {
       userId: decoded.userId,
       companyId: decoded.companyId,
       email: decoded.email,
-      role: decoded.role
+      role: decoded.role,
+      twoFactorVerified: decoded.twoFactorVerified
     };
 
     next();
@@ -87,13 +97,18 @@ export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFu
 
     // Verify and decode the token
     const decoded = verifyToken(token);
+
+    if (decoded.twoFactorPending) {
+      return next();
+    }
     
     // Attach user information to request object
     (req as any).user = {
       userId: decoded.userId,
       companyId: decoded.companyId,
       email: decoded.email,
-      role: decoded.role
+      role: decoded.role,
+      twoFactorVerified: decoded.twoFactorVerified
     };
 
     next();

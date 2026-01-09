@@ -7,6 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum WhiteLabelStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+enum SAMLStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  ENABLE_2FA
+  DISABLE_2FA
+  SAML_LOGIN
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -17,36 +39,130 @@ model User {
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
+  twoFactorAuth TwoFactorAuth?
+  auditLogs     AuditLog[]
+
   @@index([companyId])
   @@map("users")
 }
 
 model Company {
-  id                    String             @id @default(cuid())
-  name                  String
-  industry              String   // Manufacturing, Retail, Healthcare
-  employees             Int
-  subscriptionStatus    String?  @default("trial") // trial, active, inactive, cancelled
-  subscriptionTier      String?  @default("starter") // starter, growth, enterprise
-  trialStart            DateTime?
-  trialEnd              DateTime?
-  nextBillingDate       DateTime?
-  stripeCustomerId      String?  @unique
-  stripeSubscriptionId  String?  @unique
-  users                 User[]
-  inventory             Inventory[]
-  orders                Order[]
-  suppliers             Supplier[]
-  demandForecasts       DemandForecast[]
-  kpis                  KPI[]
-  locations             Location[]
-  purchaseOrders        PurchaseOrder[]
-  shipments             Shipment[]
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  id                   String            @id @default(cuid())
+  name                 String
+  industry             String   // Manufacturing, Retail, Healthcare
+  employees            Int
+  subscriptionStatus   String?  @default("trial") // trial, active, inactive, cancelled
+  subscriptionTier     String?  @default("starter") // starter, growth, enterprise
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  nextBillingDate      DateTime?
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
+
+  customDomain      String?          @unique
+  whitelabelStatus  WhiteLabelStatus @default(INACTIVE)
+  samlEnabled       Boolean          @default(false)
+
+  users          User[]
+  inventory      Inventory[]
+  orders         Order[]
+  suppliers      Supplier[]
+  demandForecasts DemandForecast[]
+  kpis           KPI[]
+  locations      Location[]
+  purchaseOrders PurchaseOrder[]
+  shipments      Shipment[]
+
+  whiteLabelConfig WhiteLabelConfig?
+  samlConfig       SAMLConfig?
+  auditLogs        AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("companies")
+}
+
+model WhiteLabelConfig {
+  id                 String           @id @default(cuid())
+  companyId           String           @unique
+  company             Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  customDomain        String?          @unique
+  logoUrl             String?
+  faviconUrl          String?
+
+  primaryColor        String?
+  secondaryColor      String?
+  fontFamily          String?
+
+  headerText          String?
+  footerText          String?
+  removedBranding     Boolean          @default(false)
+
+  customHelpCenterUrl String?
+  status              WhiteLabelStatus @default(PENDING)
+
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@map("white_label_configs")
+}
+
+model SAMLConfig {
+  id           String     @id @default(cuid())
+  companyId     String     @unique
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  idpUrl        String
+  certificate   String
+  entityId      String?
+  nameIdFormat  String?
+  status        SAMLStatus @default(INACTIVE)
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("saml_configs")
+}
+
+model TwoFactorAuth {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  secret      String
+  backupCodes String
+
+  enabled     Boolean  @default(false)
+  enabledAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@map("two_factor_auth")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  companyId  String
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action     AuditAction
+  resource   String
+  resourceId String?
+  changes    Json?
+
+  timestamp  DateTime    @default(now())
+  ipAddress  String?
+  userAgent  String?
+
+  @@index([companyId, timestamp])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
 }
 
 model Inventory {
@@ -100,26 +216,26 @@ model Order {
 }
 
 model Supplier {
-  id              String          @id @default(cuid())
-  companyId       String
-  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  orders          Order[]
-  inventory       Inventory[]
-  purchaseOrders  PurchaseOrder[]
-  name            String
-  contactName     String?
-  contactEmail    String?
-  contactPhone    String?
-  address         String?
-  onTimeRate      Float           @default(0)  // percentage
-  qualityRate     Float           @default(0)  // percentage
-  leadTime        Float           @default(0)  // days
-  performanceScore Float          @default(0)  // 0-100
-  paymentTerms    String?         // e.g., "Net 30"
-  status          String          @default("ACTIVE") // ACTIVE, INACTIVE
-  issues          String?         // JSON array of issues
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id               String         @id @default(cuid())
+  companyId        String
+  company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  orders           Order[]
+  inventory        Inventory[]
+  purchaseOrders   PurchaseOrder[]
+  name             String
+  contactName      String?
+  contactEmail     String?
+  contactPhone     String?
+  address          String?
+  onTimeRate       Float          @default(0)  // percentage
+  qualityRate      Float          @default(0)  // percentage
+  leadTime         Float          @default(0)  // days
+  performanceScore Float         @default(0)  // 0-100
+  paymentTerms     String?        // e.g., "Net 30"
+  status           String         @default("ACTIVE") // ACTIVE, INACTIVE
+  issues           String?        // JSON array of issues
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@index([companyId])
   @@index([status])
@@ -187,20 +303,20 @@ model Location {
 }
 
 model PurchaseOrder {
-  id          String        @id @default(cuid())
-  companyId   String
-  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  supplierId  String
-  supplier    Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  poNumber    String
-  status      String        @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, IN_TRANSIT, RECEIVED, CANCELLED
-  totalAmount Float         @default(0)
-  dueDate     DateTime?
+  id           String        @id @default(cuid())
+  companyId    String
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplierId   String
+  supplier     Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  poNumber     String
+  status       String        @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, IN_TRANSIT, RECEIVED, CANCELLED
+  totalAmount  Float         @default(0)
+  dueDate      DateTime?
   receivedDate DateTime?
-  notes       String?
-  lineItems   POLineItem[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  notes        String?
+  lineItems    POLineItem[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@unique([companyId, poNumber])
   @@index([companyId])
@@ -227,23 +343,23 @@ model POLineItem {
 }
 
 model Shipment {
-  id              String              @id @default(cuid())
-  companyId       String
-  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  trackingNumber  String
-  carrier         String
-  status          String              @default("PENDING") // PENDING, PICKED, SHIPPED, IN_TRANSIT, DELIVERED, DELAYED, CANCELLED
-  fromLocation    String
-  toLocation      String
-  eta             DateTime?
-  actualDelivery  DateTime?
-  daysLate        Int                 @default(0)
-  orderReference  String?
-  totalValue      Float?
-  items           String?             // JSON array of items
-  timeline        ShipmentTimeline[]
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id             String             @id @default(cuid())
+  companyId      String
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trackingNumber String
+  carrier        String
+  status         String             @default("PENDING") // PENDING, PICKED, SHIPPED, IN_TRANSIT, DELIVERED, DELAYED, CANCELLED
+  fromLocation   String
+  toLocation     String
+  eta            DateTime?
+  actualDelivery DateTime?
+  daysLate       Int                @default(0)
+  orderReference String?
+  totalValue     Float?
+  items          String?            // JSON array of items
+  timeline       ShipmentTimeline[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   @@unique([companyId, trackingNumber])
   @@index([companyId])
@@ -253,14 +369,14 @@ model Shipment {
 }
 
 model ShipmentTimeline {
-  id          String    @id @default(cuid())
-  shipmentId  String
-  shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  status      String    // PICKED, SHIPPED, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, EXCEPTION
-  location    String?
-  notes       String?
-  timestamp   DateTime  @default(now())
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(cuid())
+  shipmentId String
+  shipment  Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status    String   // PICKED, SHIPPED, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, EXCEPTION
+  location  String?
+  notes     String?
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([shipmentId])
   @@index([timestamp])

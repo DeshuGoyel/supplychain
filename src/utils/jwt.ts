@@ -1,10 +1,12 @@
 import jwt from 'jsonwebtoken';
 
-interface JWTPayload {
+export interface JWTPayload {
   userId: string;
   companyId: string;
   email: string;
   role: string;
+  twoFactorPending?: boolean;
+  twoFactorVerified?: boolean;
 }
 
 interface TokenData {
@@ -20,17 +22,19 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
  * @param payload - User data to include in token
  * @returns Object with token and expiration info
  */
-export const generateToken = (payload: JWTPayload): TokenData => {
+export const generateToken = (payload: JWTPayload, options?: { expiresIn?: string }): TokenData => {
   try {
+    const expiresIn = options?.expiresIn || JWT_EXPIRES_IN;
+
     const token = jwt.sign(payload, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
+      expiresIn,
       issuer: 'supplychain-ai',
       audience: 'supplychain-users'
     } as jwt.SignOptions);
 
     return {
       token,
-      expiresIn: JWT_EXPIRES_IN
+      expiresIn
     };
   } catch (error) {
     throw new Error('Failed to generate JWT token');

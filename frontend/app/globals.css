@@ -5,6 +5,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  --brand-primary: #2563eb;
+  --brand-secondary: #64748b;
+  --brand-font-family: Arial, Helvetica, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,7 +21,24 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--brand-font-family);
+}
+
+.btn-primary {
+  background-color: var(--brand-primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  filter: brightness(0.92);
+}
+
+.text-brand {
+  color: var(--brand-primary);
+}
+
+.bg-brand {
+  background-color: var(--brand-primary);
 }
 
 @layer utilities {

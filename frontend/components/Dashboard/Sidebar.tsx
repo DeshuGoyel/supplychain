@@ -15,9 +15,13 @@ import {
   Users,
   TrendingUp,
   MapPin,
-  PieChart
+  PieChart,
+  Palette,
+  ClipboardList,
+  KeyRound
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/context/ThemeContext';
 import { cn } from '@/components/Common/Button';
 
 interface SidebarProps {
@@ -30,6 +34,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { theme } = useTheme();
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
@@ -41,14 +46,26 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, 
     { name: 'Issues', icon: AlertCircle, href: '/dashboard/issues' },
     { name: 'Reports', icon: BarChart3, href: '/dashboard/reports' },
     { name: 'Settings', icon: Settings, href: '/dashboard/settings' },
+    { name: 'Two-Factor Auth', icon: KeyRound, href: '/settings/2fa' },
+    ...(user?.role === 'MANAGER'
+      ? [
+          { name: 'White Label', icon: Palette, href: '/admin/white-label' },
+          { name: 'Audit Logs', icon: ClipboardList, href: '/admin/audit-logs' },
+        ]
+      : []),
   ];
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-slate-900 text-white">
       <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800">
         <div className={cn("flex items-center space-x-2 transition-all", collapsed && "opacity-0 invisible w-0")}>
-          <ShieldAlert className="h-8 w-8 text-blue-400" />
-          <span className="text-xl font-bold tracking-tight">SCACA</span>
+          {theme.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={theme.logoUrl} alt="Logo" className="h-8 w-8 object-contain" />
+          ) : (
+            <ShieldAlert className="h-8 w-8 text-brand" />
+          )}
+          <span className="text-xl font-bold tracking-tight">{theme.headerText || 'SCACA'}</span>
         </div>
         {!collapsed && (
           <button 
@@ -78,7 +95,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, 
               className={cn(
                 "flex items-center px-4 py-3 text-sm font-medium transition-colors relative group",
                 isActive 
-                  ? "bg-blue-600 text-white" 
+                  ? "bg-brand text-white" 
                   : "text-slate-400 hover:bg-slate-800 hover:text-white",
                 collapsed && "justify-center"
               )}
