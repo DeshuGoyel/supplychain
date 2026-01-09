@@ -2,11 +2,17 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import passport from 'passport';
+import helmet from 'helmet';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import { optionalAuthMiddleware } from './middleware/auth';
+import { whiteLabelMiddleware } from './middleware/whiteLabel';
 
 // Import routes
+import samlRoutes from './routes/saml';
+import twofaRoutes from './routes/twofa';
 import authRoutes from './routes/auth';
 import dashboardRoutes from './routes/dashboard';
 import inventoryRoutes from './routes/inventory';
@@ -15,6 +21,8 @@ import purchaseOrderRoutes from './routes/purchaseOrders';
 import shipmentRoutes from './routes/shipments';
 import demandRoutes from './routes/demand';
 import analyticsRoutes from './routes/analytics';
+import whiteLabelRoutes from './routes/whitelabel';
+import auditRoutes from './routes/audit';
 
 // Load environment variables
 dotenv.config();
@@ -22,6 +30,8 @@ dotenv.config();
 const app: Application = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
+
+app.set('trust proxy', 1);
 
 // CORS configuration
 const corsOrigins = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'];
@@ -31,6 +41,41 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Security headers
+app.use(
+  helmet({
+    frameguard: { action: 'deny' },
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'self'"],
+      },
+    },
+    hsts: process.env.NODE_ENV === 'production',
+  })
+);
+
+// Enforce HTTPS in production behind a proxy
+app.use((req: Request, res: Response, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+    if (proto !== 'https') {
+      res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+      return;
+    }
+  }
+  next();
+});
+
+// Static uploads (local development fallback)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Optional auth + white-label headers
+app.use(optionalAuthMiddleware);
+app.use(whiteLabelMiddleware);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -68,6 +113,8 @@ app.get('/api/health', async (req: Request, res: Response) => {
 });
 
 // API routes
+app.use('/api/auth/saml', samlRoutes);
+app.use('/api/auth/2fa', twofaRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
@@ -76,6 +123,8 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/demand', demandRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/white-label', whiteLabelRoutes);
+app.use('/api/audit-logs', auditRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -86,13 +135,17 @@ app.get('/', (req: Request, res: Response) => {
     endpoints: {
       health: '/api/health',
       auth: '/api/auth',
+      saml: '/api/auth/saml',
+      twoFactor: '/api/auth/2fa',
       dashboard: '/api/dashboard',
       inventory: '/api/inventory',
       suppliers: '/api/suppliers',
       purchaseOrders: '/api/purchase-orders',
       shipments: '/api/shipments',
       demand: '/api/demand',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      whiteLabel: '/api/white-label',
+      auditLogs: '/api/audit-logs'
     }
   });
 });

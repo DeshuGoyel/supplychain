@@ -1,9 +1,13 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { AuditAction, PrismaClient } from '@prisma/client';
 import { hashPassword, comparePassword, validatePassword } from '../utils/auth';
 import { generateToken } from '../utils/jwt';
+import { TwoFactorService } from '../services/twofa.service';
+import { AuditLogService } from '../services/audit.service';
 
 const prisma = new PrismaClient();
+const twofa = new TwoFactorService();
+const audit = new AuditLogService();
 
 interface SignupRequestBody {
   email: string;
@@ -199,12 +203,70 @@ export const login = async (req: Request<{}, {}, LoginRequestBody>, res: Respons
       return;
     }
 
+    const isTwoFAEnabled = await twofa.isTwoFAEnabled(user.id);
+
+    if (isTwoFAEnabled) {
+      const tempToken = generateToken(
+        {
+          userId: user.id,
+          companyId: user.companyId,
+          email: user.email,
+          role: user.role,
+          twoFactorPending: true,
+        },
+        { expiresIn: '5m' }
+      );
+
+      await audit.logAction({
+        companyId: user.companyId,
+        userId: user.id,
+        action: AuditAction.LOGIN,
+        resource: 'auth',
+        changes: { method: 'password', twoFactorRequired: true },
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Two-factor authentication required',
+        requiresTwoFactor: true,
+        tempToken: tempToken.token,
+        expiresIn: tempToken.expiresIn,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          companyId: user.companyId,
+          company: {
+            id: user.company.id,
+            name: user.company.name,
+            industry: user.company.industry,
+            employees: user.company.employees
+          }
+        }
+      });
+
+      return;
+    }
+
     // Generate JWT token
     const tokenData = generateToken({
       userId: user.id,
       companyId: user.companyId,
       email: user.email,
       role: user.role
+    });
+
+    await audit.logAction({
+      companyId: user.companyId,
+      userId: user.id,
+      action: AuditAction.LOGIN,
+      resource: 'auth',
+      changes: { method: 'password' },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
     });
 
     // Return success response
