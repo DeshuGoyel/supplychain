@@ -8,32 +8,33 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // bcrypt hashed
-  name      String
-  role      String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String         // bcrypt hashed
+  name          String
+  role          String         @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
+  companyId     String
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  twoFactorAuth TwoFactorAuth?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   
   @@index([companyId])
   @@map("users")
 }
 
 model Company {
-  id                    String             @id @default(cuid())
+  id                    String              @id @default(cuid())
   name                  String
-  industry              String   // Manufacturing, Retail, Healthcare
+  industry              String              // Manufacturing, Retail, Healthcare
   employees             Int
-  subscriptionStatus    String?  @default("trial") // trial, active, inactive, cancelled
-  subscriptionTier      String?  @default("starter") // starter, growth, enterprise
+  subscriptionStatus    String?             @default("trial") // trial, active, inactive, cancelled
+  subscriptionTier      String?             @default("starter") // starter, growth, enterprise
   trialStart            DateTime?
   trialEnd              DateTime?
   nextBillingDate       DateTime?
-  stripeCustomerId      String?  @unique
-  stripeSubscriptionId  String?  @unique
+  stripeCustomerId      String?             @unique
+  stripeSubscriptionId  String?             @unique
   users                 User[]
   inventory             Inventory[]
   orders                Order[]
@@ -43,8 +44,16 @@ model Company {
   locations             Location[]
   purchaseOrders        PurchaseOrder[]
   shipments             Shipment[]
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  subscriptions         Subscription[]
+  invoices              Invoice[]
+  usageRecords          UsageRecord[]
+  referralProgram       ReferralProgram?
+  whiteLabelConfig      WhiteLabelConfig?
+  samlConfig            SAMLConfig?
+  auditLogs             AuditLog[]
+  emailPreferences      EmailPreferences?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
   @@map("companies")
 }
@@ -265,4 +274,176 @@ model ShipmentTimeline {
   @@index([shipmentId])
   @@index([timestamp])
   @@map("shipment_timeline")
+}
+
+// Monetization Models
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  companyId            String
+  company              Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stripeSubscriptionId String    @unique
+  stripePriceId        String
+  tier                 String    // starter, growth, enterprise
+  status               String    // active, past_due, canceled, trialing
+  billingCycle         String    @default("monthly") // monthly, annual
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id              String    @id @default(cuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stripeInvoiceId String    @unique
+  amount          Float
+  currency        String    @default("usd")
+  status          String    // paid, open, void, uncollectible
+  pdfUrl          String?
+  invoiceNumber   String?
+  billingPeriod   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model UsageRecord {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  metric    String   // apiCalls, storage, users, reports, exports
+  quantity  Int
+  timestamp DateTime @default(now())
+
+  @@index([companyId])
+  @@index([metric])
+  @@index([timestamp])
+  @@map("usage_records")
+}
+
+model ReferralProgram {
+  id             String                @id @default(cuid())
+  companyId      String                @unique
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  referralCode   String                @unique
+  totalReferrals Int                   @default(0)
+  creditEarned   Float                 @default(0)
+  conversions    ReferralConversion[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([referralCode])
+  @@map("referral_programs")
+}
+
+model ReferralConversion {
+  id                String          @id @default(cuid())
+  referralProgramId String
+  referralProgram   ReferralProgram @relation(fields: [referralProgramId], references: [id], onDelete: Cascade)
+  referralCode      String
+  referredCompanyId String
+  referredEmail     String
+  creditApplied     Float
+  status            String          @default("pending") // pending, approved, paid
+  convertedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([referralCode])
+  @@index([referredCompanyId])
+  @@map("referral_conversions")
+}
+
+model WhiteLabelConfig {
+  id                  String    @id @default(cuid())
+  companyId           String    @unique
+  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customDomain        String?
+  logoUrl             String?
+  faviconUrl          String?
+  primaryColor        String    @default("#3B82F6")
+  secondaryColor      String    @default("#10B981")
+  fontFamily          String    @default("Inter")
+  customHeaderText    String?
+  customFooterText    String?
+  removeBranding      Boolean   @default(false)
+  customHelpCenterUrl String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("white_label_configs")
+}
+
+model SAMLConfig {
+  id          String    @id @default(cuid())
+  companyId   String    @unique
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  idpUrl      String    // Identity Provider URL
+  certificate String    @db.Text // X.509 certificate
+  entityId    String
+  status      String    @default("inactive") // active, inactive
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("saml_configs")
+}
+
+model TwoFactorAuth {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret      String   // TOTP secret (encrypted)
+  backupCodes String   @db.Text // JSON array of backup codes
+  enabled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("two_factor_auth")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId     String
+  action     String   // CREATE, UPDATE, DELETE, LOGIN, EXPORT, etc.
+  resource   String   // User, Inventory, Order, etc.
+  resourceId String?
+  changes    String?  @db.Text // JSON of changes
+  ipAddress  String?
+  userAgent  String?
+  timestamp  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model EmailPreferences {
+  id                String    @id @default(cuid())
+  companyId         String    @unique
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  receiveEmails     Boolean   @default(true)
+  emailFrequency    String    @default("weekly") // daily, weekly, never
+  announcements     Boolean   @default(true)
+  tips              Boolean   @default(true)
+  caseStudies       Boolean   @default(true)
+  productUpdates    Boolean   @default(true)
+  marketingEmails   Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("email_preferences")
 }
