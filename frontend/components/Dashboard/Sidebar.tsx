@@ -15,9 +15,14 @@ import {
   Users,
   TrendingUp,
   MapPin,
-  PieChart
+  PieChart,
+  Palette,
+  ShieldCheck,
+  CreditCard,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/context/ThemeContext';
 import { cn } from '@/components/Common/Button';
 
 interface SidebarProps {
@@ -30,6 +35,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { settings } = useTheme();
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
@@ -40,6 +46,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, 
     { name: 'Analytics', icon: PieChart, href: '/dashboard/analytics' },
     { name: 'Issues', icon: AlertCircle, href: '/dashboard/issues' },
     { name: 'Reports', icon: BarChart3, href: '/dashboard/reports' },
+    { name: 'White-label', icon: Palette, href: '/dashboard/whitelabel' },
+    { name: 'Security', icon: ShieldCheck, href: '/dashboard/security' },
+    { name: 'Billing', icon: CreditCard, href: '/dashboard/billing' },
+    { name: 'Audit Logs', icon: FileText, href: '/dashboard/audit-logs' },
     { name: 'Settings', icon: Settings, href: '/dashboard/settings' },
   ];
 
@@ -47,8 +57,18 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, 
     <div className="flex flex-col h-full bg-slate-900 text-white">
       <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800">
         <div className={cn("flex items-center space-x-2 transition-all", collapsed && "opacity-0 invisible w-0")}>
-          <ShieldAlert className="h-8 w-8 text-blue-400" />
-          <span className="text-xl font-bold tracking-tight">SCACA</span>
+          {settings?.enabled && settings?.logoUrl ? (
+            <img 
+              src={settings.logoUrl.startsWith('http') ? settings.logoUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${settings.logoUrl}`} 
+              alt="Logo" 
+              className="h-8 object-contain"
+            />
+          ) : (
+            <ShieldAlert className="h-8 w-8 text-blue-400" />
+          )}
+          <span className="text-xl font-bold tracking-tight">
+            {settings?.enabled && settings?.companyName ? settings.companyName : 'SCACA'}
+          </span>
         </div>
         {!collapsed && (
           <button 

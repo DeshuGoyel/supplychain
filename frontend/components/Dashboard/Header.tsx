@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/context/ThemeContext';
 import { Bell, Search, User, LogOut, Settings, Menu } from 'lucide-react';
 
 interface HeaderProps {
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick, title }) => {
   const { user, logout } = useAuth();
+  const { settings } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
@@ -23,6 +25,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, title }) => {
         >
           <Menu size={24} />
         </button>
+        {settings?.enabled && settings?.logoUrl ? (
+          <img 
+            src={settings.logoUrl.startsWith('http') ? settings.logoUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${settings.logoUrl}`} 
+            alt="Logo" 
+            className="h-8 mr-4 object-contain"
+          />
+        ) : null}
         <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
       </div>
 
