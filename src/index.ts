@@ -15,6 +15,13 @@ import purchaseOrderRoutes from './routes/purchaseOrders';
 import shipmentRoutes from './routes/shipments';
 import demandRoutes from './routes/demand';
 import analyticsRoutes from './routes/analytics';
+import whitelabelRoutes from './routes/whitelabel';
+import ssoRoutes from './routes/sso';
+import twoFactorRoutes from './routes/twoFactor';
+import auditRoutes from './routes/audit';
+import billingRoutes from './routes/billing';
+import webhookRoutes from './routes/webhooks';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -32,6 +39,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Webhook routes (must be before body parsers for raw body access)
+app.use('/api/webhooks', webhookRoutes);
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -44,6 +54,9 @@ app.use(globalRateLimiter);
 
 // Passport middleware
 app.use(passport.initialize());
+
+// Serve static files from public directory
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 // Health check endpoint with DB connection test
 app.get('/api/health', async (req: Request, res: Response) => {
@@ -76,6 +89,11 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/demand', demandRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/whitelabel', whitelabelRoutes);
+app.use('/api/sso', ssoRoutes);
+app.use('/api/auth/2fa', twoFactorRoutes);
+app.use('/api/audit-logs', auditRoutes);
+app.use('/api/billing', billingRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -92,7 +110,8 @@ app.get('/', (req: Request, res: Response) => {
       purchaseOrders: '/api/purchase-orders',
       shipments: '/api/shipments',
       demand: '/api/demand',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      whitelabel: '/api/whitelabel'
     }
   });
 });

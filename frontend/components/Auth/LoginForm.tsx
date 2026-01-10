@@ -14,10 +14,37 @@ const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+
+    if (requiresTwoFactor) {
+      if (!twoFactorCode) {
+        setLocalError('Please enter your 2FA code');
+        return;
+      }
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login/2fa`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, code: twoFactorCode })
+        });
+        const data = await response.json();
+        if (data.success) {
+          localStorage.setItem('token', data.token);
+          window.location.href = '/dashboard';
+        } else {
+          setLocalError(data.message || 'Invalid 2FA code');
+        }
+      } catch (err) {
+        setLocalError('An error occurred during 2FA verification');
+      }
+      return;
+    }
 
     if (!email || !password) {
       setLocalError('Please fill in all fields');
@@ -25,9 +52,24 @@ const LoginForm: React.FC = () => {
     }
 
     try {
-      await login({ email, password });
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json();
+      
+      if (data.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        setUserId(data.userId);
+      } else if (data.success) {
+        localStorage.setItem('token', data.token);
+        window.location.href = '/dashboard';
+      } else {
+        setLocalError(data.message || 'Login failed');
+      }
     } catch {
-      // Error is handled by context
+      setLocalError('An error occurred during login');
     }
   };
 
@@ -45,67 +87,87 @@ const LoginForm: React.FC = () => {
       <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
         {error && <Alert variant="error">{error}</Alert>}
 
-        <div className="space-y-4">
-          <Input
-            label="Email address"
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="manager@acme.com"
-          />
-
-          <div className="relative">
+        {requiresTwoFactor ? (
+          <div className="space-y-4">
             <Input
-              label="Password"
-              id="password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
+              label="Two-Factor Authentication Code"
+              id="twoFactorCode"
+              name="twoFactorCode"
+              type="text"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              value={twoFactorCode}
+              onChange={(e) => setTwoFactorCode(e.target.value)}
+              placeholder="123456"
             />
-            <button
-              type="button"
-              className="absolute right-3 top-[34px] text-gray-400 hover:text-gray-600"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
+            <p className="text-sm text-gray-600">
+              Enter the 6-digit code from your authenticator app or a backup code.
+            </p>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="space-y-4">
+              <Input
+                label="Email address"
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="manager@acme.com"
+              />
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <input
-              id="remember-me"
-              name="remember-me"
-              type="checkbox"
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-              Remember me
-            </label>
-          </div>
+              <div className="relative">
+                <Input
+                  label="Password"
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-[34px] text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
 
-          <div className="text-sm">
-            <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
-              Forgot your password?
-            </a>
-          </div>
-        </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                  Remember me
+                </label>
+              </div>
+
+              <div className="text-sm">
+                <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+                  Forgot your password?
+                </a>
+              </div>
+            </div>
+          </>
+        )}
 
         <Button
           type="submit"
           className="w-full"
           isLoading={isLoading}
         >
-          Sign in
+          {requiresTwoFactor ? 'Verify & Sign in' : 'Sign in'}
         </Button>
 
         <div className="text-center">
