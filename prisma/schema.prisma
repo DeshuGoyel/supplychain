@@ -8,17 +8,32 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // bcrypt hashed
-  name      String
-  role      String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  email                String   @unique
+  password             String?  // bcrypt hashed (nullable for SSO-only users)
+  name                 String
+  role                 String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
+  companyId            String
+  company              Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // SSO & 2FA fields
+  ssoProvider          String?  // "google", "microsoft", "saml"
+  ssoProviderId        String?  // external ID from SSO provider
+  twoFactorEnabled     Boolean  @default(false)
+  twoFactorSecret      String?  // encrypted TOTP secret
+  twoFactorBackupCodes String?  // JSON array of backup codes, hashed
+  lastLoginAt          DateTime?
+  loginAttempts        Int      @default(0)
+  lockedUntil          DateTime?
+  
+  // Audit trail
+  auditLogs            AuditLog[]
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
   @@index([companyId])
+  @@index([ssoProvider])
   @@map("users")
 }
 
@@ -27,6 +42,8 @@ model Company {
   name                  String
   industry              String   // Manufacturing, Retail, Healthcare
   employees             Int
+  
+  // Billing fields (existing)
   subscriptionStatus    String?  @default("trial") // trial, active, inactive, cancelled
   subscriptionTier      String?  @default("starter") // starter, growth, enterprise
   trialStart            DateTime?
@@ -34,6 +51,25 @@ model Company {
   nextBillingDate       DateTime?
   stripeCustomerId      String?  @unique
   stripeSubscriptionId  String?  @unique
+  
+  // Additional billing fields
+  billingEmail          String?
+  billingAddress        String?
+  taxId                 String?
+  
+  // White-label fields
+  whiteLabelEnabled     Boolean  @default(false)
+  whiteLabelLogo        String?  // URL to company logo
+  whiteLabelFavicon     String?  // URL to favicon
+  whiteLabelPrimary     String?  // hex color
+  whiteLabelSecondary   String?  // hex color
+  whiteLabelDomain      String?  @unique // custom domain
+  hideSupplyChainBranding Boolean @default(false)
+  whiteLabelFooter      String?  // custom footer text
+  whiteLabelTerms       String?  // terms of service URL
+  whiteLabelPrivacy     String?  // privacy policy URL
+  
+  // Relations
   users                 User[]
   inventory             Inventory[]
   orders                Order[]
@@ -43,6 +79,11 @@ model Company {
   locations             Location[]
   purchaseOrders        PurchaseOrder[]
   shipments             Shipment[]
+  whiteLabel            WhiteLabel?
+  ssoIntegrations       SSOIntegration[]
+  payments              Payment[]
+  invoices              Invoice[]
+  auditLogs             AuditLog[]
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -265,4 +306,161 @@ model ShipmentTimeline {
   @@index([shipmentId])
   @@index([timestamp])
   @@map("shipment_timeline")
+}
+
+// White-label configuration model
+model WhiteLabel {
+  id                    String   @id @default(cuid())
+  companyId             String   @unique
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // Branding
+  logoUrl               String?  // Company logo URL
+  faviconUrl            String?  // Favicon URL
+  primaryColor          String?  // hex color code
+  secondaryColor        String?  // hex color code
+  
+  // Custom domain
+  customDomain          String?  @unique
+  
+  // Customization options
+  hideSupplyChainBranding Boolean @default(false)
+  customFooterText       String?
+  
+  // Legal
+  termsOfServiceUrl      String?
+  privacyPolicyUrl       String?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([companyId])
+  @@index([customDomain])
+  @@map("white_labels")
+}
+
+// SSO Integration model
+model SSOIntegration {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  provider              String   // "google", "microsoft", "okta", "saml"
+  clientId              String
+  clientSecret          String   // encrypted
+  enabled               Boolean  @default(false)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([companyId])
+  @@index([provider])
+  @@map("sso_integrations")
+}
+
+// Audit Log model
+model AuditLog {
+  id                    String   @id @default(cuid())
+  userId                String?
+  user                  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  companyId             String?
+  company               Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  
+  action                String   // "LOGIN", "LOGOUT", "SSO_ATTEMPT", "2FA_ENABLED", etc.
+  ipAddress             String?
+  userAgent             String?
+  success               Boolean  @default(true)
+  details               String?  // JSON string for additional details
+  
+  timestamp             DateTime @default(now())
+  
+  @@index([userId])
+  @@index([companyId])
+  @@index([action])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+// Payment model
+model Payment {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  stripePaymentIntentId String?  @unique
+  amount                Float
+  currency              String   @default("USD")
+  status                String   // "pending", "succeeded", "failed"
+  paymentMethod         String?  // "card", "bank_transfer", etc.
+  description           String?
+  metadata              String?  // JSON string
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+// Invoice model
+model Invoice {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  stripeInvoiceId       String   @unique
+  subscriptionId        String?
+  amount                Float
+  status                String   // "draft", "sent", "paid", "void", "uncollectible"
+  pdfUrl                String?
+  issuedAt              DateTime
+  dueDate               DateTime?
+  paidAt                DateTime?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([companyId])
+  @@index([status])
+  @@index([issuedAt])
+  @@map("invoices")
+}
+
+// Plan model for pricing tiers
+model Plan {
+  id                    String   @id @default(cuid())
+  stripePriceId         String   @unique
+  name                  String   // "Starter", "Growth", "Enterprise"
+  tier                  String   // "starter", "growth", "enterprise"
+  monthlyPrice          Float
+  yearlyPrice           Float
+  features              String   // JSON array
+  maxUsers              Int
+  maxApiCalls           Int      @default(10000)
+  maxStorageGb          Int      @default(10)
+  isActive              Boolean  @default(true)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([tier])
+  @@index([isActive])
+  @@map("plans")
+}
+
+// User Consent model for legal compliance
+model UserConsent {
+  id                    String   @id @default(cuid())
+  userId                String
+  consentType           String   // "terms", "privacy", "cookies", "marketing"
+  version               String   // version of the document
+  granted               Boolean
+  timestamp             DateTime @default(now())
+  
+  @@index([userId])
+  @@index([consentType])
+  @@index([timestamp])
+  @@map("user_consents")
 }
