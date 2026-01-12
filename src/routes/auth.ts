@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { signup, login, login2FA } from '../controllers/authController';
+import { initiateOAuth, handleOAuthCallback } from '../controllers/oauthController';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -19,6 +20,20 @@ router.post('/signup', signup);
  * @body    { email, password }
  */
 router.post('/login', login);
+
+/**
+ * @route   GET /api/auth/oauth/:provider
+ * @desc    Initiate OAuth login
+ * @access  Public
+ */
+router.get('/oauth/:provider', initiateOAuth);
+
+/**
+ * @route   GET /api/auth/oauth/:provider/callback
+ * @desc    OAuth callback
+ * @access  Public
+ */
+router.get('/oauth/:provider/callback', handleOAuthCallback);
 
 /**
  * @route   POST /api/auth/login/2fa
@@ -102,6 +117,8 @@ router.get('/me', authMiddleware, async (req, res) => {
         name: userData.name,
         role: userData.role,
         companyId: userData.companyId,
+        twoFactorEnabled: userData.twoFactorEnabled,
+        ssoProvider: userData.ssoProvider,
         createdAt: userData.createdAt,
         updatedAt: userData.updatedAt,
         company: {

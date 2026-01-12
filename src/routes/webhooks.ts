@@ -99,6 +99,55 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req: Re
         }
         break;
       }
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as any;
+        const company = await prisma.company.findUnique({
+          where: { stripeCustomerId: invoice.customer }
+        });
+
+        if (company) {
+          await prisma.company.update({
+            where: { id: company.id },
+            data: {
+              subscriptionStatus: 'past_due'
+            }
+          });
+        }
+        break;
+      }
+      case 'invoice.created': {
+        const invoice = event.data.object as any;
+        const company = await prisma.company.findUnique({
+          where: { stripeCustomerId: invoice.customer }
+        });
+
+        if (company) {
+          await prisma.invoice.upsert({
+            where: { stripeInvoiceId: invoice.id },
+            update: {
+              status: invoice.status,
+              amount: (invoice.amount_due || invoice.amount_paid || 0) / 100,
+              pdfUrl: invoice.invoice_pdf,
+              dueDate: invoice.due_date ? new Date(invoice.due_date * 1000) : null,
+            },
+            create: {
+              companyId: company.id,
+              stripeInvoiceId: invoice.id,
+              subscriptionId: invoice.subscription as string,
+              amount: (invoice.amount_due || 0) / 100,
+              status: invoice.status || 'draft',
+              pdfUrl: invoice.invoice_pdf,
+              dueDate: invoice.due_date ? new Date(invoice.due_date * 1000) : null,
+            }
+          });
+        }
+        break;
+      }
+      case 'charge.refunded': {
+        // Optionally sync refunds to Payment records
+        console.log('Charge refunded:', (event.data.object as any).id);
+        break;
+      }
       default:
         console.log(`Unhandled event type ${event.type}`);
     }

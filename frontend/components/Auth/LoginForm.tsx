@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const LoginForm: React.FC = () => {
   const { login, isLoading, error: authError } = useAuth();
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -138,6 +139,27 @@ const LoginForm: React.FC = () => {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `${apiUrl}/api/auth/oauth/google?returnTo=${encodeURIComponent('/dashboard')}`;
+                }}
+                className="w-full border border-gray-300 rounded-md py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                Continue with Google
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `${apiUrl}/api/auth/oauth/github?returnTo=${encodeURIComponent('/dashboard')}`;
+                }}
+                className="w-full border border-gray-300 rounded-md py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                Continue with GitHub
+              </button>
             </div>
 
             <div className="flex items-center justify-between">
