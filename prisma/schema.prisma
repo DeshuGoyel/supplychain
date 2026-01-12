@@ -26,7 +26,9 @@ model User {
   loginAttempts         Int      @default(0)
   lockedUntil           DateTime?
   
+  // Relations
   auditLogs             AuditLog[]
+  legalAcceptances      UserLegalAcceptance[]
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   
@@ -72,6 +74,10 @@ model Company {
   payments              Payment[]
   invoices              Invoice[]
   auditLogs             AuditLog[]
+  
+  // Usage tracking relations
+  usageMetrics          UsageMetric[]
+  usageLimit            UsageLimit?
   
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
@@ -401,4 +407,67 @@ model ShipmentTimeline {
   @@index([shipmentId])
   @@index([timestamp])
   @@map("shipment_timeline")
+}
+
+model LegalDocument {
+  id            String   @id @default(cuid())
+  type          String   // TERMS_OF_SERVICE | PRIVACY_POLICY | COOKIE_POLICY | ACCEPTABLE_USE | DPA
+  version       String
+  title         String
+  content       String   @db.Text
+  effectiveDate DateTime
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@unique([type, version])
+  @@index([type])
+  @@map("legal_documents")
+}
+
+model UserLegalAcceptance {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentType  String        // TERMS_OF_SERVICE | PRIVACY_POLICY | etc
+  version       String
+  acceptedAt    DateTime      @default(now())
+  ipAddress     String?
+  userAgent     String?
+
+  @@unique([userId, documentType])
+  @@index([userId])
+  @@index([documentType])
+  @@map("user_legal_acceptances")
+}
+
+model UsageMetric {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  metricType  String   // API_CALLS | ORDERS_PROCESSED | ACTIVE_USERS | STORAGE_GB
+  value       Float
+  period      DateTime @db.Date // Period for this metric (usually day or month)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, metricType, period])
+  @@index([companyId])
+  @@index([metricType])
+  @@index([period])
+  @@map("usage_metrics")
+}
+
+model UsageLimit {
+  id             String   @id @default(cuid())
+  companyId      String   @unique
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  apiCallsUsed   Int      @default(0)
+  apiCallsLimit  Int      @default(10000)
+  storageUsed    Float    @default(0)
+  storageLimit   Float    @default(5) // GB
+  lastResetAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("usage_limits")
 }

@@ -52,7 +52,7 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
     let customerId = company.stripeCustomerId;
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: company.billingEmail || undefined,
+        email: company.billingEmail || `billing+${company.id}@example.com`,
         name: company.name,
         metadata: { companyId: company.id }
       });

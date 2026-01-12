@@ -11,6 +11,7 @@
     "seed": "ts-node src/seeds/seed.ts",
     "seed:dashboard": "ts-node src/seeds/seedDashboard.ts",
     "seed:production": "ts-node src/seeds/seedProduction.ts",
+    "seed:legal": "ts-node prisma/seedLegalDocuments.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",

@@ -21,6 +21,9 @@ import twoFactorRoutes from './routes/twoFactor';
 import auditRoutes from './routes/audit';
 import billingRoutes from './routes/billing';
 import webhookRoutes from './routes/webhooks';
+import legalRoutes from './routes/legal';
+import usageRoutes from './routes/usage';
+import subscriptionRoutes from './routes/subscription';
 import path from 'path';
 
 // Load environment variables
@@ -94,6 +97,9 @@ app.use('/api/sso', ssoRoutes);
 app.use('/api/auth/2fa', twoFactorRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/legal', legalRoutes);
+app.use('/api/usage', usageRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
