@@ -8,15 +8,27 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // bcrypt hashed
-  name      String
-  role      String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  password              String   // bcrypt hashed
+  name                  String
+  role                  String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // SSO & 2FA Extensions
+  ssoProvider           String?  // google, microsoft, saml
+  ssoProviderId         String?
+  twoFactorEnabled      Boolean  @default(false)
+  twoFactorSecret       String?  // encrypted TOTP secret
+  twoFactorBackupCodes  String?  // JSON array of backup codes, hashed
+  lastLoginAt           DateTime?
+  loginAttempts         Int      @default(0)
+  lockedUntil           DateTime?
+  
+  auditLogs             AuditLog[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
   
   @@index([companyId])
   @@map("users")
@@ -27,6 +39,8 @@ model Company {
   name                  String
   industry              String   // Manufacturing, Retail, Healthcare
   employees             Int
+  
+  // Subscription fields
   subscriptionStatus    String?  @default("trial") // trial, active, inactive, cancelled
   subscriptionTier      String?  @default("starter") // starter, growth, enterprise
   trialStart            DateTime?
@@ -34,6 +48,10 @@ model Company {
   nextBillingDate       DateTime?
   stripeCustomerId      String?  @unique
   stripeSubscriptionId  String?  @unique
+  billingEmail          String?
+  billingAddress        String?
+  taxId                 String?
+  
   users                 User[]
   inventory             Inventory[]
   orders                Order[]
@@ -43,10 +61,128 @@ model Company {
   locations             Location[]
   purchaseOrders        PurchaseOrder[]
   shipments             Shipment[]
+  
+  // White-labeling relation
+  whiteLabel            WhiteLabel?
+  
+  // SSO integrations
+  ssoIntegrations       SSOIntegration[]
+  
+  // Billing relations
+  payments              Payment[]
+  invoices              Invoice[]
+  auditLogs             AuditLog[]
+  
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
   @@map("companies")
+}
+
+model WhiteLabel {
+  id                      String   @id @default(cuid())
+  companyId               String   @unique
+  company                 Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  enabled                 Boolean  @default(false)
+  logoUrl                 String?
+  faviconUrl              String?
+  primaryColor            String?  @default("#3b82f6")
+  secondaryColor          String?  @default("#1e40af")
+  customDomain            String?  @unique
+  hideSupplyChainBranding Boolean  @default(false)
+  customFooterText        String?
+  termsOfServiceUrl       String?
+  privacyPolicyUrl        String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("white_labels")
+}
+
+model SSOIntegration {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider      String   // google | microsoft | okta | saml
+  clientId      String
+  clientSecret  String   // encrypted
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("sso_integrations")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  action      String   // LOGIN | LOGOUT | SSO_ATTEMPT | 2FA_ENABLED | etc
+  ipAddress   String?
+  userAgent   String?
+  success     Boolean  @default(true)
+  timestamp   DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model Payment {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stripePaymentIntentId String   @unique
+  amount                Float
+  currency              String   @default("USD")
+  status                String   // pending | succeeded | failed
+  paymentMethod         String?
+  description           String?
+  metadata              Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("payments")
+}
+
+model Invoice {
+  id               String    @id @default(cuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stripeInvoiceId  String    @unique
+  subscriptionId   String?
+  amount           Float
+  status           String    // draft | sent | paid | void | uncollectible
+  pdfUrl           String?
+  issuedAt         DateTime  @default(now())
+  dueDate          DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([companyId])
+  @@map("invoices")
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  stripePriceId String   @unique
+  name          String   // Starter | Growth | Enterprise
+  tier          String   // starter | growth | enterprise
+  monthlyPrice  Float
+  yearlyPrice   Float
+  features      Json     // Array of features
+  maxUsers      Int
+  maxApiCalls   Int
+  maxStorageGb  Int
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("plans")
 }
 
 model Inventory {

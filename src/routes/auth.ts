@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { signup, login } from '../controllers/authController';
+import { signup, login, login2FA } from '../controllers/authController';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -19,6 +19,14 @@ router.post('/signup', signup);
  * @body    { email, password }
  */
 router.post('/login', login);
+
+/**
+ * @route   POST /api/auth/login/2fa
+ * @desc    Complete login with 2FA
+ * @access  Public
+ * @body    { userId, code }
+ */
+router.post('/login/2fa', login2FA);
 
 /**
  * @route   POST /api/auth/logout

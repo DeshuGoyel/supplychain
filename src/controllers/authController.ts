@@ -199,6 +199,17 @@ export const login = async (req: Request<{}, {}, LoginRequestBody>, res: Respons
       return;
     }
 
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      res.status(200).json({
+        success: true,
+        requiresTwoFactor: true,
+        userId: user.id,
+        message: 'Two-factor authentication required'
+      });
+      return;
+    }
+
     // Generate JWT token
     const tokenData = generateToken({
       userId: user.id,
@@ -233,6 +244,113 @@ export const login = async (req: Request<{}, {}, LoginRequestBody>, res: Respons
     res.status(500).json({
       success: false,
       message: 'Internal server error during login',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+};
+/**
+ * Complete login with 2FA
+ * POST /api/auth/login/2fa
+ */
+export const login2FA = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      res.status(400).json({
+        success: false,
+        message: 'User ID and 2FA code are required',
+        code: 'MISSING_FIELDS'
+      });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { company: true }
+    });
+
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid request or 2FA not enabled',
+        code: 'INVALID_REQUEST'
+      });
+      return;
+    }
+
+    const { decrypt } = await import('../utils/encryption');
+    const { verifyTOTPCode } = await import('../utils/totp');
+
+    const secret = decrypt(user.twoFactorSecret);
+    const isValid = verifyTOTPCode(secret, code);
+
+    if (!isValid) {
+      // Check backup codes
+      if (user.twoFactorBackupCodes) {
+        const { verifyBackupCode } = await import('../utils/backup-codes');
+        const hashedBackupCodes = JSON.parse(user.twoFactorBackupCodes);
+        const matchIndex = await verifyBackupCode(code, hashedBackupCodes);
+        
+        if (matchIndex !== -1) {
+          // Valid backup code, remove it from list
+          hashedBackupCodes.splice(matchIndex, 1);
+          await prisma.user.update({
+            where: { id: userId },
+            data: { twoFactorBackupCodes: JSON.stringify(hashedBackupCodes) }
+          });
+          // Proceed to login
+        } else {
+          res.status(401).json({
+            success: false,
+            message: 'Invalid 2FA code or backup code',
+            code: 'INVALID_CODE'
+          });
+          return;
+        }
+      } else {
+        res.status(401).json({
+          success: false,
+          message: 'Invalid 2FA code',
+          code: 'INVALID_CODE'
+        });
+        return;
+      }
+    }
+
+    // Generate JWT token
+    const tokenData = generateToken({
+      userId: user.id,
+      companyId: user.companyId,
+      email: user.email,
+      role: user.role
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      token: tokenData.token,
+      expiresIn: tokenData.expiresIn,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        companyId: user.companyId,
+        company: {
+          id: user.company.id,
+          name: user.company.name,
+          industry: user.company.industry,
+          employees: user.company.employees
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Login 2FA error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during 2FA login',
       code: 'INTERNAL_ERROR'
     });
   }
