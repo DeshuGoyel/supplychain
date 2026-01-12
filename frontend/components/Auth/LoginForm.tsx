@@ -9,7 +9,7 @@ import Alert from '@/components/Common/Alert';
 import { useAuth } from '@/hooks/useAuth';
 
 const LoginForm: React.FC = () => {
-  const { login, isLoading, error: authError } = useAuth();
+  const { isLoading, error: authError } = useAuth();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
