@@ -5,6 +5,7 @@ import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import { whiteLabelMiddleware } from './middleware/whiteLabel';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -16,10 +17,12 @@ import shipmentRoutes from './routes/shipments';
 import demandRoutes from './routes/demand';
 import analyticsRoutes from './routes/analytics';
 import whitelabelRoutes from './routes/whitelabel';
+import whiteLabelApiRoutes from './routes/whiteLabel';
 import ssoRoutes from './routes/sso';
 import twoFactorRoutes from './routes/twoFactor';
 import auditRoutes from './routes/audit';
 import billingRoutes from './routes/billing';
+import legalRoutes from './routes/legal';
 import webhookRoutes from './routes/webhooks';
 import path from 'path';
 
@@ -54,6 +57,9 @@ app.use(globalRateLimiter);
 
 // Passport middleware
 app.use(passport.initialize());
+
+// White-label middleware (inject config based on host/custom domain)
+app.use(whiteLabelMiddleware);
 
 // Serve static files from public directory
 app.use(express.static(path.join(process.cwd(), 'public')));
@@ -90,10 +96,12 @@ app.use('/api/shipments', shipmentRoutes);
 app.use('/api/demand', demandRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/whitelabel', whitelabelRoutes);
+app.use('/api/white-label', whiteLabelApiRoutes);
 app.use('/api/sso', ssoRoutes);
 app.use('/api/auth/2fa', twoFactorRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/legal', legalRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {

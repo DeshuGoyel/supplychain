@@ -134,3 +134,77 @@ export const cancelSubscription = async (req: Request, res: Response): Promise<v
     res.status(500).json({ success: false, message: 'Internal server error cancelling subscription' });
   }
 };
+
+export const createBillingPortalLink = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const companyId = (req as any).user.companyId as string;
+    const company = await prisma.company.findUnique({ where: { id: companyId } });
+
+    if (!company || !company.stripeCustomerId) {
+      res.status(400).json({ success: false, message: 'Stripe customer not found for this company' });
+      return;
+    }
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: company.stripeCustomerId,
+      return_url: `${process.env.FRONTEND_URL}/dashboard/billing`,
+    });
+
+    res.status(200).json({ success: true, url: session.url });
+  } catch (error) {
+    console.error('Create billing portal link error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error creating portal link' });
+  }
+};
+
+export const getUsage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const companyId = (req as any).user.companyId as string;
+
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        subscriptionStatus: true,
+        subscriptionTier: true,
+        nextBillingDate: true,
+        stripeCustomerId: true,
+      },
+    });
+
+    const plan = company?.subscriptionTier
+      ? await prisma.plan.findFirst({ where: { tier: company.subscriptionTier, isActive: true } })
+      : null;
+
+    const usersUsed = await prisma.user.count({ where: { companyId } });
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const apiCallsAgg = await prisma.usageMetric.aggregate({
+      where: { companyId, metric: 'api_calls', timestamp: { gte: monthStart } },
+      _sum: { value: true },
+    });
+
+    const storageAgg = await prisma.usageMetric.aggregate({
+      where: { companyId, metric: 'storage_gb', timestamp: { gte: monthStart } },
+      _sum: { value: true },
+    });
+
+    res.status(200).json({
+      success: true,
+      usage: {
+        usersUsed,
+        apiCallsUsed: apiCallsAgg._sum.value || 0,
+        storageUsedGb: storageAgg._sum.value || 0,
+        subscriptionStatus: company?.subscriptionStatus || 'trial',
+        nextBillingDate: company?.nextBillingDate,
+        apiCallsTrend: 0,
+        activeUsers: usersUsed,
+      },
+      plan,
+    });
+  } catch (error) {
+    console.error('Get usage error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error fetching usage' });
+  }
+};

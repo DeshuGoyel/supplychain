@@ -20,6 +20,8 @@ export interface SignupPayload {
   name: string;
   companyName: string;
   industry: string;
+  termsAccepted?: boolean;
+  privacyAccepted?: boolean;
 }
 
 export interface LoginPayload {

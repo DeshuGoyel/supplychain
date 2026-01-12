@@ -15,21 +15,22 @@ model User {
   role                  String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
   companyId             String
   company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+
   // SSO & 2FA Extensions
-  ssoProvider           String?  // google, microsoft, saml
+  ssoProvider           String?  // google, github, microsoft, auth0
   ssoProviderId         String?
+  oauthProfile          Json?
   twoFactorEnabled      Boolean  @default(false)
   twoFactorSecret       String?  // encrypted TOTP secret
   twoFactorBackupCodes  String?  // JSON array of backup codes, hashed
   lastLoginAt           DateTime?
   loginAttempts         Int      @default(0)
   lockedUntil           DateTime?
-  
+
   auditLogs             AuditLog[]
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
-  
+
   @@index([companyId])
   @@map("users")
 }
@@ -65,14 +66,14 @@ model Company {
   // White-labeling relation
   whiteLabel            WhiteLabel?
   
-  // SSO integrations
-  ssoIntegrations       SSOIntegration[]
-  
+  // OAuth/SSO integrations
+  oauthProviders        OAuthProvider[]
+
   // Billing relations
   payments              Payment[]
   invoices              Invoice[]
   auditLogs             AuditLog[]
-  
+
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -84,13 +85,26 @@ model WhiteLabel {
   companyId               String   @unique
   company                 Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   enabled                 Boolean  @default(false)
+
+  // Branding
+  brandName               String?
   logoUrl                 String?
   faviconUrl              String?
   primaryColor            String?  @default("#3b82f6")
   secondaryColor          String?  @default("#1e40af")
+
+  // Domains
   customDomain            String?  @unique
+
+  // UI / links
+  supportEmail            String?
+  footerText              String?
   hideSupplyChainBranding Boolean  @default(false)
+
+  // Legacy field (kept for backwards compatibility)
   customFooterText        String?
+
+  // Legal links
   termsOfServiceUrl       String?
   privacyPolicyUrl        String?
   createdAt               DateTime @default(now())
@@ -99,19 +113,20 @@ model WhiteLabel {
   @@map("white_labels")
 }
 
-model SSOIntegration {
+model OAuthProvider {
   id            String   @id @default(cuid())
   companyId     String
   company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  provider      String   // google | microsoft | okta | saml
+  provider      String   // google | github | microsoft | auth0 | saml
   clientId      String
   clientSecret  String   // encrypted
   enabled       Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([companyId, provider])
   @@index([companyId])
-  @@map("sso_integrations")
+  @@map("oauth_providers")
 }
 
 model AuditLog {
@@ -183,6 +198,56 @@ model Plan {
   updatedAt     DateTime @updatedAt
 
   @@map("plans")
+}
+
+enum LegalDocumentType {
+  TERMS_OF_SERVICE
+  PRIVACY_POLICY
+  COOKIE_POLICY
+  ACCEPTABLE_USE_POLICY
+  DATA_PROCESSING_AGREEMENT
+}
+
+model LegalDocument {
+  id            String            @id @default(cuid())
+  type          LegalDocumentType
+  version       String
+  content       String
+  effectiveDate DateTime
+  createdAt     DateTime          @default(now())
+
+  @@unique([type, version])
+  @@index([type])
+  @@map("legal_documents")
+}
+
+model UserLegalAcceptance {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentType LegalDocumentType
+  version      String
+  acceptedAt   DateTime          @default(now())
+
+  @@unique([userId, documentType, version])
+  @@index([userId])
+  @@index([documentType])
+  @@map("user_legal_acceptances")
+}
+
+model UsageMetric {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  metric    String
+  value     Int
+  metadata  Json?
+  timestamp DateTime @default(now())
+
+  @@index([companyId])
+  @@index([metric])
+  @@index([timestamp])
+  @@map("usage_metrics")
 }
 
 model Inventory {

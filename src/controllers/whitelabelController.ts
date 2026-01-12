@@ -19,10 +19,16 @@ export const getWhitelabelSettings = async (req: Request, res: Response): Promis
 
     if (!settings) {
       // Create default settings if they don't exist
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { name: true }
+      });
+
       settings = await prisma.whiteLabel.create({
         data: {
           companyId,
           enabled: false,
+          brandName: company?.name,
           primaryColor: '#3b82f6',
           secondaryColor: '#1e40af'
         }
@@ -48,29 +54,37 @@ export const getWhitelabelSettings = async (req: Request, res: Response): Promis
  */
 export const updateWhitelabelSettings = async (req: Request, res: Response): Promise<void> => {
   try {
-    const companyId = (req as any).user.companyId;
+    const companyId = (req as any).user.companyId as string;
     const {
       enabled,
+      brandName,
       logoUrl,
       faviconUrl,
       primaryColor,
       secondaryColor,
       customDomain,
+      supportEmail,
+      footerText,
       hideSupplyChainBranding,
       customFooterText,
       termsOfServiceUrl,
       privacyPolicyUrl
-    } = req.body;
+    } = req.body as Record<string, any>;
+
+    const normalizedDomain = typeof customDomain === 'string' && customDomain ? customDomain.toLowerCase().split(':')[0] : customDomain;
 
     const settings = await prisma.whiteLabel.upsert({
       where: { companyId },
       update: {
         enabled,
+        brandName,
         logoUrl,
         faviconUrl,
         primaryColor,
         secondaryColor,
-        customDomain,
+        customDomain: normalizedDomain,
+        supportEmail,
+        footerText: footerText ?? customFooterText,
         hideSupplyChainBranding,
         customFooterText,
         termsOfServiceUrl,
@@ -79,11 +93,14 @@ export const updateWhitelabelSettings = async (req: Request, res: Response): Pro
       create: {
         companyId,
         enabled: !!enabled,
+        brandName,
         logoUrl,
         faviconUrl,
         primaryColor,
         secondaryColor,
-        customDomain,
+        customDomain: normalizedDomain,
+        supportEmail,
+        footerText: footerText ?? customFooterText,
         hideSupplyChainBranding: !!hideSupplyChainBranding,
         customFooterText,
         termsOfServiceUrl,
@@ -187,17 +204,19 @@ export const uploadFavicon = async (req: Request, res: Response): Promise<void> 
  */
 export const validateCustomDomain = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { domain } = req.body;
-    const companyId = (req as any).user.companyId;
+    const { domain } = req.body as { domain?: unknown };
+    const companyId = (req as any).user.companyId as string;
 
-    if (!domain) {
+    if (typeof domain !== 'string' || !domain.trim()) {
       res.status(400).json({ success: false, message: 'Domain is required' });
       return;
     }
 
+    const normalizedDomain = domain.trim().toLowerCase().split(':')[0] || domain;
+
     const existingDomain = await prisma.whiteLabel.findFirst({
       where: {
-        customDomain: domain,
+        customDomain: normalizedDomain,
         NOT: { companyId }
       }
     });

@@ -71,6 +71,8 @@ const SignupForm: React.FC = () => {
         name: formData.name,
         companyName: formData.companyName,
         industry: formData.industry,
+        termsAccepted: formData.terms,
+        privacyAccepted: formData.terms,
       });
     } catch {
       // Error handled by context

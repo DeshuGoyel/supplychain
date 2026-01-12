@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import CookieConsent from "@/components/Common/CookieConsent";
+import ToasterProvider from "@/components/Common/ToasterProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,6 +24,7 @@ export default function RootLayout({
         <AuthProvider>
           <ThemeProvider>
             {children}
+            <ToasterProvider />
             <CookieConsent />
           </ThemeProvider>
         </AuthProvider>
