@@ -32,6 +32,15 @@ export interface AuthResponse {
   token: string;
 }
 
+// Generic API Response wrapper
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+  timestamp?: string;
+}
+
 // Dashboard Types
 export interface InventoryData {
   totalSKUs: number;
