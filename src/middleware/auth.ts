@@ -2,12 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 
 /**
- * Authentication middleware to verify JWT tokens
+ * Authentication middleware to verify JWT tokens (alias for authMiddleware)
  * @param req - Express request object
  * @param res - Express response object
  * @param next - Express next function
  */
-export const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+export const authenticateToken = (req: Request, res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -45,7 +45,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
     next();
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Authentication failed';
-    
+
     if (message.includes('expired')) {
       res.status(401).json({
         success: false,
@@ -61,6 +61,16 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
       code: 'INVALID_TOKEN'
     });
   }
+};
+
+/**
+ * Authentication middleware to verify JWT tokens
+ * @param req - Express request object
+ * @param res - Express response object
+ * @param next - Express next function
+ */
+export const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+  authenticateToken(req, res, next);
 };
 
 /**
