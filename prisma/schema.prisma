@@ -15,7 +15,7 @@ model User {
   role                  String   @default("MANAGER") // MANAGER, PLANNER, COORDINATOR, FINANCE
   companyId             String
   company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+
   // SSO & 2FA Extensions
   ssoProvider           String?  // google, microsoft, saml
   ssoProviderId         String?
@@ -25,13 +25,15 @@ model User {
   lastLoginAt           DateTime?
   loginAttempts         Int      @default(0)
   lockedUntil           DateTime?
-  
+
   // Relations
   auditLogs             AuditLog[]
   legalAcceptances      UserLegalAcceptance[]
+  notificationPreferences NotificationPreference[]
+  notificationLogs       NotificationLog[]
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
-  
+
   @@index([companyId])
   @@map("users")
 }
@@ -41,7 +43,7 @@ model Company {
   name                  String
   industry              String   // Manufacturing, Retail, Healthcare
   employees             Int
-  
+
   // Subscription fields
   subscriptionStatus    String?  @default("trial") // trial, active, inactive, cancelled
   subscriptionTier      String?  @default("starter") // starter, growth, enterprise
@@ -53,7 +55,7 @@ model Company {
   billingEmail          String?
   billingAddress        String?
   taxId                 String?
-  
+
   users                 User[]
   inventory             Inventory[]
   orders                Order[]
@@ -63,22 +65,40 @@ model Company {
   locations             Location[]
   purchaseOrders        PurchaseOrder[]
   shipments             Shipment[]
-  
+
   // White-labeling relation
   whiteLabel            WhiteLabel?
-  
+
   // SSO integrations
   ssoIntegrations       SSOIntegration[]
-  
+
   // Billing relations
   payments              Payment[]
   invoices              Invoice[]
   auditLogs             AuditLog[]
-  
+
   // Usage tracking relations
   usageMetrics          UsageMetric[]
   usageLimit            UsageLimit?
-  
+
+  // Notification System relations
+  notificationPreferences NotificationPreference[]
+  notificationLogs       NotificationLog[]
+
+  // Supplier Performance relations
+  supplierMetrics       SupplierMetric[]
+
+  // Forecasting relations
+  forecastHistories     ForecastHistory[]
+  reorderSuggestions    ReorderSuggestion[]
+
+  // Report relations
+  reports               Report[]
+  scheduledReports      ScheduledReport[]
+
+  // Bulk Operation relations
+  bulkOperations        BulkOperation[]
+
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -121,19 +141,26 @@ model SSOIntegration {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  action      String   // LOGIN | LOGOUT | SSO_ATTEMPT | 2FA_ENABLED | etc
-  ipAddress   String?
-  userAgent   String?
-  success     Boolean  @default(true)
-  timestamp   DateTime @default(now())
+  id            String   @id @default(cuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  action        String   // LOGIN | LOGOUT | SSO_ATTEMPT | 2FA_ENABLED | CREATE | UPDATE | DELETE | EXPORT
+  entityType    String?  // USER | INVENTORY | ORDER | SUPPLIER | REPORT
+  entityId      String?
+  changesBefore Json?
+  changesAfter  Json?
+  ipAddress     String?
+  userAgent     String?
+  success       Boolean  @default(true)
+  timestamp     DateTime @default(now())
 
   @@index([companyId])
   @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([timestamp])
   @@map("audit_logs")
 }
 
@@ -209,6 +236,7 @@ model Inventory {
   safetyStock   Int?
   supplierId    String?
   supplier      Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  reorderSuggestions ReorderSuggestion[]
   lastUpdated   DateTime  @updatedAt
   createdAt     DateTime  @default(now())
 
@@ -248,6 +276,7 @@ model Supplier {
   orders          Order[]
   inventory       Inventory[]
   purchaseOrders  PurchaseOrder[]
+  metrics         SupplierMetric[]
   name            String
   contactName     String?
   contactEmail    String?
@@ -470,4 +499,176 @@ model UsageLimit {
   updatedAt      DateTime @updatedAt
 
   @@map("usage_limits")
+}
+
+// Notification System Models
+model NotificationPreference {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  notificationType String   // LOW_INVENTORY, LATE_ORDER, SUPPLIER_ALERT, APPROVAL_NEEDED, DAILY_DIGEST, WEEKLY_REPORT
+  enabled          Boolean  @default(true)
+  frequency        String   @default("immediate") // immediate, daily, weekly, monthly
+  email            Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, notificationType])
+  @@index([userId])
+  @@index([companyId])
+  @@map("notification_preferences")
+}
+
+model NotificationLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type        String   // LOW_INVENTORY, LATE_ORDER, SUPPLIER_ALERT, APPROVAL_NEEDED, DAILY_DIGEST, WEEKLY_REPORT
+  status      String   @default("sent") // sent, failed, pending
+  email       String
+  subject     String
+  content     String   @db.Text
+  metadata    Json?
+  timestamp   DateTime @default(now())
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([type])
+  @@index([timestamp])
+  @@map("notification_logs")
+}
+
+// Supplier Performance Models
+model SupplierMetric {
+  id                  String    @id @default(cuid())
+  supplierId          String
+  supplier            Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  companyId           String
+  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  onTimeDeliveryRate  Float     @default(0)
+  qualityScore        Float     @default(0)
+  costTrend           Float     @default(0)
+  leadTimeVariance    Float     @default(0)
+  period              String    // e.g., "2025-01"
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([supplierId, period])
+  @@index([supplierId])
+  @@index([companyId])
+  @@index([period])
+  @@map("supplier_metrics")
+}
+
+// Forecasting Models
+model ForecastHistory {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sku         String
+  period      String   // e.g., "2025-01"
+  forecast    Float
+  actual      Float?
+  accuracy    Float?
+  confidence  Float?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([companyId, sku, period])
+  @@index([companyId])
+  @@index([sku])
+  @@index([period])
+  @@map("forecast_history")
+}
+
+model ReorderSuggestion {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sku           String
+  inventoryId   String
+  inventory     Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  suggestedQty  Int
+  reason        String   // below_reorder_point, forecast_high_demand, safety_stock_low, manual
+  priority      String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status        String   @default("pending") // pending, approved, rejected, completed
+  approvedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([sku])
+  @@index([status])
+  @@index([priority])
+  @@map("reorder_suggestions")
+}
+
+// Report Models
+model Report {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reportType   String   // monthly_performance, supplier, inventory, order, forecast, custom
+  title        String
+  format       String   // pdf, excel, csv
+  filters      Json?
+  generatedBy  String
+  fileUrl      String?
+  fileSize     Int?
+  status       String   @default("completed") // processing, completed, failed
+  createdAt    DateTime @default(now())
+
+  @@index([companyId])
+  @@index([reportType])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+model ScheduledReport {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reportType  String   // monthly_performance, supplier, inventory, order, forecast, custom
+  schedule    String   // daily, weekly, monthly, quarterly
+  enabled     Boolean  @default(true)
+  email       String
+  filters     Json?
+  nextRunAt   DateTime
+  lastRunAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([enabled])
+  @@index([nextRunAt])
+  @@map("scheduled_reports")
+}
+
+// Bulk Operation Models
+model BulkOperation {
+  id            String   @id @default(cuid())
+  jobId         String   @unique
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type          String   // inventory_import, order_import, supplier_import, bulk_update, bulk_create
+  status        String   @default("pending") // pending, processing, completed, failed, partial
+  totalRows     Int
+  processedRows Int      @default(0)
+  successCount  Int      @default(0)
+  errorCount    Int      @default(0)
+  errors        Json?
+  userId        String
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  @@index([companyId])
+  @@index([jobId])
+  @@index([status])
+  @@map("bulk_operations")
 }

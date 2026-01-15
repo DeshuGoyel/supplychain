@@ -5,6 +5,10 @@ import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import compression from 'compression';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import { scheduledTasks } from './jobs/scheduledTasks';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -24,6 +28,12 @@ import webhookRoutes from './routes/webhooks';
 import legalRoutes from './routes/legal';
 import usageRoutes from './routes/usage';
 import subscriptionRoutes from './routes/subscription';
+import notificationRoutes from './routes/notifications';
+import supplierEnhancedRoutes from './routes/supplierEnhanced';
+import forecastRoutes from './routes/forecasts';
+import reportRoutes from './routes/reports';
+import bulkOperationRoutes from './routes/bulkOperations';
+import cacheRoutes from './routes/cache';
 import path from 'path';
 
 // Load environment variables
@@ -32,6 +42,38 @@ dotenv.config();
 const app: Application = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
+
+// Create HTTP server for Socket.IO
+const httpServer = createServer(app);
+
+// Initialize Socket.IO for real-time updates
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    credentials: true,
+  },
+});
+
+io.on('connection', (socket) => {
+  console.log(`Client connected: ${socket.id}`);
+
+  socket.on('dashboard:subscribe', (data: { companyId: string }) => {
+    socket.join(`dashboard:${data.companyId}`);
+    console.log(`Client subscribed to dashboard: ${data.companyId}`);
+  });
+
+  socket.on('dashboard:unsubscribe', (data: { companyId: string }) => {
+    socket.leave(`dashboard:${data.companyId}`);
+    console.log(`Client unsubscribed from dashboard: ${data.companyId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
+});
+
+// Export io for use in other modules
+export { io };
 
 // CORS configuration
 const corsOrigins = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'];
@@ -44,6 +86,9 @@ app.use(cors({
 
 // Webhook routes (must be before body parsers for raw body access)
 app.use('/api/webhooks', webhookRoutes);
+
+// Compression middleware
+app.use(compression());
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -88,9 +133,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/suppliers', supplierEnhancedRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/demand', demandRoutes);
+app.use('/api/forecasts', forecastRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/whitelabel', whitelabelRoutes);
 app.use('/api/sso', ssoRoutes);
@@ -100,6 +147,10 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/usage', usageRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/bulk', bulkOperationRoutes);
+app.use('/api/cache', cacheRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -160,11 +211,12 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📝 API Documentation: http://localhost:${PORT}`);
+  console.log(`🔌 WebSocket server: http://localhost:${PORT}`);
 });
 
 export default app;

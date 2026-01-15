@@ -7,8 +7,34 @@ import {
   getDemandData,
   getKPIData,
 } from '../controllers/dashboard';
+import {
+  getDashboardData,
+  getChartData,
+  refreshDashboard,
+} from '../controllers/dashboardEnhanced';
 
 const router = Router();
+
+/**
+ * @route   GET /api/dashboard/data
+ * @desc    Get full dashboard data
+ * @access  Private (requires valid JWT)
+ */
+router.get('/data', authMiddleware, getDashboardData);
+
+/**
+ * @route   GET /api/dashboard/charts/:chartName
+ * @desc    Get individual chart data
+ * @access  Private (requires valid JWT)
+ */
+router.get('/charts/:chartName', authMiddleware, getChartData);
+
+/**
+ * @route   POST /api/dashboard/refresh
+ * @desc    Refresh dashboard cache
+ * @access  Private (requires valid JWT)
+ */
+router.post('/refresh', authMiddleware, refreshDashboard);
 
 /**
  * @route   GET /api/dashboard/inventory
