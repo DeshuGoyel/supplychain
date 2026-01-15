@@ -2,13 +2,17 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import passport from 'passport';
+import helmet from 'helmet';
 import { PrismaClient } from '@prisma/client';
 import { globalRateLimiter } from './middleware/rateLimiter';
-import { requestLogger } from './middleware/requestLogger';
+import { requestLogger, errorLogger, performanceMonitor } from './middleware/advancedLogger';
 import compression from 'compression';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { scheduledTasks } from './jobs/scheduledTasks';
+import { enhancedHealthCheck, globalErrorHandler, notFoundHandler, validateEnvironment } from './middleware/errorHandler';
+import { apiRateLimiter, monitorDatabaseHealth, monitorMemoryUsage } from './middleware/production';
+import { securityHeaders } from './middleware/security';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -38,6 +42,15 @@ import path from 'path';
 
 // Load environment variables
 dotenv.config();
+
+// Validate environment on startup
+try {
+  validateEnvironment();
+  console.log('✅ Environment validation passed');
+} catch (error) {
+  console.error('❌ Environment validation failed:', error.message);
+  process.exit(1);
+}
 
 const app: Application = express();
 const prisma = new PrismaClient();
@@ -81,8 +94,27 @@ app.use(cors({
   origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
 }));
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.stripe.com", "wss:"],
+      frameSrc: ["'self'", "https://js.stripe.com"]
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+// Custom security headers
+app.use(securityHeaders);
 
 // Webhook routes (must be before body parsers for raw body access)
 app.use('/api/webhooks', webhookRoutes);
@@ -96,6 +128,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logging middleware
 app.use(requestLogger);
+app.use(performanceMonitor);
 
 // Rate limiting middleware
 app.use(globalRateLimiter);
@@ -106,27 +139,8 @@ app.use(passport.initialize());
 // Serve static files from public directory
 app.use(express.static(path.join(process.cwd(), 'public')));
 
-// Health check endpoint with DB connection test
-app.get('/api/health', async (req: Request, res: Response) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.status(200).json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      version: '1.0.0',
-      database: 'connected'
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      version: '1.0.0',
-      database: 'disconnected'
-    });
-  }
-});
+// Health check endpoint with enhanced monitoring
+app.get('/api/health', enhancedHealthCheck);
 
 // API routes
 app.use('/api/auth', authRoutes);
@@ -174,24 +188,10 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // 404 handler
-app.use('*', (req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-    path: req.originalUrl
-  });
-});
+app.use('*', notFoundHandler);
 
 // Global error handler
-app.use((err: Error, req: Request, res: Response, next: any) => {
-  console.error('Global error handler:', err);
-  
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-  });
-});
+app.use(globalErrorHandler);
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
