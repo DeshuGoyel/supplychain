@@ -102,3 +102,22 @@ prisma/migrations/
 # Temporary files
 tmp/
 temp/
+
+# Production files
+backups/
+monitoring/data/
+nginx/logs/
+ssl/
+
+# Docker
+.dockerignore
+
+# Security
+*.pem
+*.key
+*.crt
+secrets/
+
+# Performance and monitoring
+metrics/
+prometheus_data/
