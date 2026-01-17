@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
+  Map as RoadmapIcon,
   AlertCircle, 
   BarChart3, 
   Settings, 
@@ -39,6 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, 
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+    { name: 'Roadmap', icon: RoadmapIcon, href: '/dashboard/progress' },
     { name: 'Inventory', icon: Package, href: '/dashboard/inventory' },
     { name: 'Suppliers', icon: Users, href: '/dashboard/suppliers' },
     { name: 'Demand Planning', icon: TrendingUp, href: '/dashboard/demand' },

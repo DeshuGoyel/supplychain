@@ -7,6 +7,7 @@ import OpenOrders from '@/components/Dashboard/OpenOrders';
 import SupplierPerformance from '@/components/Dashboard/SupplierPerformance';
 import DemandVsSupply from '@/components/Dashboard/DemandVsSupply';
 import KPICards from '@/components/Dashboard/KPICards';
+import ProgressSummary from '@/components/Dashboard/ProgressSummary';
 import {
   getInventoryData,
   getOpenOrdersData,
@@ -173,8 +174,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Top Row - 3 columns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Top Row - 4 columns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <ProgressSummary />
         <InventorySnapshot data={inventory} loading={loading} />
         <OpenOrders data={orders} loading={loading} />
         <KPICards data={kpis} loading={loading} />
